@@ -72,7 +72,7 @@ async def button_delete(update: Update, context: CallbackContext):
     await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     await context.bot.delete_message(chat_id=chat_id, message_id=command_id)
     user_id = callback_data[2].strip()
-    context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+    # await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
     user = query.from_user
     if user.last_name is not None:
        user_display_name = f"{user.first_name} {user.last_name}"
