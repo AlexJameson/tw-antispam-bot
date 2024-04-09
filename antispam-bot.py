@@ -41,9 +41,11 @@ async def report_manually(update: Update, context: CallbackContext):
         elif reply_to_message.text is None:
             words = reply_to_message.caption
         
-        regular_patterns = [pattern for pattern in REGULAR_TOKENS if re.search(pattern, words)]
+        reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
+        crit_pattern = '|'.join(map(re.escape, CRITICAL_TOKENS))
+        regular_patterns = re.findall(reg_pattern, words)
         num_regular = len(regular_patterns)
-        critical_patterns = [pattern for pattern in CRITICAL_TOKENS if re.search(pattern, words)]
+        critical_patterns = re.findall(crit_pattern, words)
         num_critical = len(critical_patterns)
         verdict = f"<b>Критические токены:</b> {num_regular}\n<b>Обычные токены:</b> {num_critical}"
 
@@ -82,7 +84,7 @@ async def button_delete(update: Update, context: CallbackContext):
     await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     await context.bot.delete_message(chat_id=chat_id, message_id=command_id)
     user_id = callback_data[2].strip()
-    await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+    #await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
     user = query.from_user
     if user.last_name is not None:
        user_display_name = f"{user.first_name} {user.last_name}"
