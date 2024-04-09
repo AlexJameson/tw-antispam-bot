@@ -49,10 +49,9 @@ async def report_manually(update: Update, context: CallbackContext):
         num_critical = len(critical_patterns)
         verdict = f"<b>Критические токены:</b> {num_regular}\n<b>Обычные токены:</b> {num_critical}"
 
-
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
-            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n @{BACKUP_ADMIN}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                     text=text_message_content,
                                     disable_web_page_preview=True,
