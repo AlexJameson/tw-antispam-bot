@@ -67,10 +67,7 @@ async def report_manually(update: Update, context: CallbackContext):
                                     parse_mode="HTML",
                                     reply_markup=keyboard)
     else:
-        await context.bot.send_message(
-            chat_id=update.message.chat_id,
-            text="Ответьте на сообщение командой /ban."
-        )
+        return
 
 async def button_delete(update: Update, context: CallbackContext):
     query = update.callback_query
