@@ -160,8 +160,13 @@ async def confirm_button(update: Update, context: CallbackContext):
         'date': str(query.message.date),
         'response': query.data
     }
-    await db.insert(response_data)
-
+    db.insert(response_data)
+    message_id = query.message.message_id
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Button pressed")]
+    ])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await context.bot.edit_reply_markup(chat_id=DEBUG_CHAT, message_id=message_id, reply_markup=reply_markup)
 
 def main():
     print("I'm working")
