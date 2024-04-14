@@ -100,6 +100,7 @@ async def button_delete(update: Update, context: CallbackContext):
         user_display_name = f"{user.first_name}"
     user_link = f"https://t.me/{user.username}"
     await query.message.reply_html(f"<a href='{user_link}'><b>{user_display_name}</b></a> забанил пользователя с ID {user_id}", disable_web_page_preview=True)
+    await query.edit_message_reply_markup(None)
 
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
@@ -158,15 +159,11 @@ async def confirm_button(update: Update, context: CallbackContext):
 
     response_data = {
         'date': str(query.message.date),
-        'response': query.data
+        'response': query.data,
+        'id': str(query.message.message_id)
     }
     db.insert(response_data)
-    message_id = query.message.message_id
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Button pressed")]
-    ])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await context.bot.edit_reply_markup(chat_id=DEBUG_CHAT, message_id=message_id, reply_markup=reply_markup)
+    await query.edit_message_reply_markup(None)
 
 def main():
     print("I'm working")
