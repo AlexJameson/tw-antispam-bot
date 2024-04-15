@@ -126,7 +126,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_regular = len(regular_patterns)
     critical_patterns = re.findall(crit_pattern, words)
     num_critical = len(critical_patterns)
-    if num_critical > 0 or num_regular > 1 or (num_critical > 0 and num_regular > 1):
+    if num_critical > 0 or num_regular > 1:
         verdict = f"<b>Критические токены:</b> {num_regular}\n<b>Обычные токены:</b> {num_critical}"
         
         keyboard = [
