@@ -4,6 +4,7 @@ import os
 import re
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import TelegramError
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from spam_tokens import REGULAR_TOKENS, CRITICAL_TOKENS
 from tinydb import TinyDB, Query
@@ -89,18 +90,29 @@ async def button_delete(update: Update, context: CallbackContext):
     command_id = callback_data[3].strip()
     chat_id_temp = str(callback_data[0])
     chat_id=f"-100{chat_id_temp}"
-    await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    await context.bot.delete_message(chat_id=chat_id, message_id=command_id)
-    user_id = callback_data[2].strip()
-    await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
-    user = query.from_user
-    if user.last_name is not None:
-        user_display_name = f"{user.first_name} {user.last_name}"
-    elif user.last_name is None:
-        user_display_name = f"{user.first_name}"
-    user_link = f"https://t.me/{user.username}"
-    await query.message.reply_html(f"<a href='{user_link}'><b>{user_display_name}</b></a> забанил пользователя с ID {user_id}", disable_web_page_preview=True)
-    await query.edit_message_reply_markup(None)
+    try:
+        # Attempt to delete message
+        await context.bot.delete_message(chat_id=chat_id, message_id=command_id)
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        
+        user_id = callback_data[2].strip()
+        # Attempt to ban the chat member
+        await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+
+        user = query.from_user
+        if user.last_name is not None:
+            user_display_name = f"{user.first_name} {user.last_name}"
+        elif user.last_name is None:
+            user_display_name = f"{user.first_name}"
+        user_link = f"https://t.me/{user.username}"
+        await query.message.reply_html(f"<a href='{user_link}'><b>{user_display_name}</b></a> забанил пользователя с ID {user_id}", disable_web_page_preview=True)
+        await query.edit_message_reply_markup(None)
+
+    except TelegramError as e:
+        # Handle error, send a custom message to the user if an error occurs
+        error_message = f"Возникла ошибка: {str(e)}"
+        await query.message.reply_html(error_message, disable_web_page_preview=True)
+        await query.edit_message_reply_markup(None)
 
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
