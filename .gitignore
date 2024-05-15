@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 
 ./db.json
+db_users.json
+db.json

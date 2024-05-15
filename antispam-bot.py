@@ -2,14 +2,15 @@
 import logging
 import os
 import re
+import sys
+sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from spam_tokens import REGULAR_TOKENS, CRITICAL_TOKENS
 from tinydb import TinyDB, Query
-from datetime import datetime, timedelta
-
+import datetime
 
 logging.basicConfig(level=logging.WARNING, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
@@ -25,12 +26,26 @@ PRIMARY_ADMIN = os.getenv('PRIMARY_ADMIN')
 BACKUP_ADMIN = os.getenv('BACKUP_ADMIN')
 
 db_file = "./db.json"
-
 if not os.path.exists(db_file):
     with open(db_file, "w") as file:
         file.write("{}")
-
 db = TinyDB(db_file)
+
+db_users_file = "./db_users.json"
+if not os.path.exists(db_users_file):
+    with open(db_users_file, "w") as users_file:
+        users_file.write("{}")
+db_users = TinyDB(db_users_file)
+
+UList = Query()
+
+async def handle_new_member(update: Update, context: CallbackContext):
+    new_users = update.message.new_chat_members
+    print(update.message.new_chat_members)
+    for user in new_users:
+       print(new_users)
+       print(user.id)
+       db_users.insert({'user_id': user.id, 'date_joined': str(datetime.datetime.now())})
 
 async def report_manually(update: Update, context: CallbackContext):  
     if update.message.reply_to_message:
@@ -116,6 +131,9 @@ async def button_delete(update: Update, context: CallbackContext):
 
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
+    #user_id = message.from_user.id
+    #if db.search(UList.user_id == user_id):
+
     numeric_chat_id = message.chat.id
     chat_id = str(numeric_chat_id).replace("-100", "")
     message_id = message.message_id
@@ -138,7 +156,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_regular = len(regular_patterns)
     critical_patterns = re.findall(crit_pattern, words)
     num_critical = len(critical_patterns)
-    if num_critical > 0 or num_regular > 1:
+    if num_critical > 0 or num_regular > 2:
         verdict = f"<b>Критические токены:</b> {num_regular}\n<b>Обычные токены:</b> {num_critical}"
         
         keyboard = [
@@ -151,19 +169,19 @@ async def check_automatically(update: Update, context: CallbackContext):
             message_text = message.text_html_urled
             text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n"
             await context.bot.send_message(chat_id=DEBUG_CHAT,
-                                    text=text_message_content,
-                                    disable_web_page_preview=True,
-                                    parse_mode="HTML",
-                                    reply_markup=reply_markup)
+                                text=text_message_content,
+                                disable_web_page_preview=True,
+                                parse_mode="HTML",
+                                reply_markup=reply_markup)
         elif message.text is None:
             message_text = message.caption_html_urled
             new_caption = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n"
             await context.bot.copy_message(chat_id=DEBUG_CHAT,
-                                    from_chat_id=message.chat_id,
-                                    message_id=message.message_id,
-                                    caption=new_caption,
-                                    parse_mode="HTML",
-                                    reply_markup=reply_markup)
+                                from_chat_id=message.chat_id,
+                                message_id=message.message_id,
+                                caption=new_caption,
+                                parse_mode="HTML",
+                                reply_markup=reply_markup)
 
 async def confirm_button(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -181,10 +199,11 @@ def main():
     print("I'm working")
 
     application = ApplicationBuilder().token(TOKEN).build()
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_member))
     application.add_handler(CallbackQueryHandler(confirm_button, pattern="Confirmed"))
     application.add_handler(CallbackQueryHandler(confirm_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_automatically))
+    #application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
 
     application.run_polling()
