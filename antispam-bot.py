@@ -3,7 +3,7 @@ import logging
 import os
 import re
 import sys
-sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
+import json
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -39,12 +39,27 @@ db_users = TinyDB(db_users_file)
 
 UList = Query()
 
+class DeleteCallbackData:
+    def __init__(self, chat_id, message_id, user_id, update_message_id):
+        self.ci = chat_id
+        self.mi = message_id
+        self.ui = user_id
+        self.umi = update_message_id
+
+class ManualEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, DeleteCallbackData):
+            return obj.__dict__
+        return json.JSONEncoder.default(self, obj)
+class AutoDeleteCallbackData:
+    def __init__(self, chat_id, message_id, user_id):
+        self.chat_id = chat_id
+        self.message_id = message_id
+        self.user_id = user_id
+
 async def handle_new_member(update: Update, context: CallbackContext):
     new_users = update.message.new_chat_members
-    print(update.message.new_chat_members)
     for user in new_users:
-       print(new_users)
-       print(user.id)
        db_users.insert({'user_id': user.id, 'date_joined': str(datetime.datetime.now())})
 
 async def report_manually(update: Update, context: CallbackContext):  
@@ -60,8 +75,10 @@ async def report_manually(update: Update, context: CallbackContext):
             user_display_name = f"{user.first_name}"
         user_link = f"https://t.me/{user.username}"
         link = f"https://t.me/c/{chat_id}/{message_id}"
+        callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
+        callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Удалить", callback_data=f"{chat_id}, {message_id}, {user.id}, {update.message.message_id}")]
+            [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized)]
         ])
         if reply_to_message.text is not None:
             words = reply_to_message.text
@@ -100,17 +117,24 @@ async def report_manually(update: Update, context: CallbackContext):
 async def button_delete(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    callback_data = query.data.split(',')
-    message_id = callback_data[1].strip()
-    command_id = callback_data[3].strip()
-    chat_id_temp = str(callback_data[0])
+    #callback_data = query.data.split(',')
+    data_string = query.data
+    callback_data = json.loads(data_string)
+    ci = callback_data.get('ci', 'DefaultCI')
+    mi = callback_data.get('mi', 0)
+    ui = callback_data.get('ui', 0)
+    umi = callback_data.get('umi', 0)
+
+    message_id = mi
+    command_id = umi
+    chat_id_temp = ci
     chat_id=f"-100{chat_id_temp}"
     try:
         # Attempt to delete message
         await context.bot.delete_message(chat_id=chat_id, message_id=command_id)
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
         
-        user_id = callback_data[2].strip()
+        user_id = ui
         # Attempt to ban the chat member
         await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
 
@@ -158,10 +182,10 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_critical = len(critical_patterns)
     if num_critical > 0 or num_regular > 2:
         verdict = f"<b>Критические токены:</b> {num_regular}\n<b>Обычные токены:</b> {num_critical}"
-        
+        auto_delete_callback_data = (chat_id, message_id, user.id)
         keyboard = [
-            [InlineKeyboardButton("True", callback_data='Confirmed'),
-             InlineKeyboardButton("False", callback_data='Declined')]
+            [InlineKeyboardButton("Удалить", callback_data=f"{chat_id}, {message_id}, {user.id}"),
+             InlineKeyboardButton("Игнорировать", callback_data='Declined')]
             ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -183,25 +207,56 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML",
                                 reply_markup=reply_markup)
 
-async def confirm_button(update: Update, context: CallbackContext):
+async def auto_button_delete(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
+    callback_data = query.data.split(',')
+    message_id = callback_data[1].strip()
+    chat_id_temp = str(callback_data[0])
+    chat_id=f"-100{chat_id_temp}"
+    try:
+        # Attempt to delete message
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        
+        user_id = callback_data[2].strip()
+        # Attempt to ban the chat member
+        await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
 
-    response_data = {
-        'date': str(query.message.date),
-        'response': query.data,
-        'id': str(query.message.message_id)
-    }
-    db.insert(response_data)
-    await query.edit_message_reply_markup(None)
+        user = query.from_user
+        if user.last_name is not None:
+            user_display_name = f"{user.first_name} {user.last_name}"
+        elif user.last_name is None:
+            user_display_name = f"{user.first_name}"
+        user_link = f"https://t.me/{user.username}"
+        await query.message.reply_html(f"<a href='{user_link}'><b>{user_display_name}</b></a> забанил пользователя с ID {user_id}", disable_web_page_preview=True)
+        await query.edit_message_reply_markup(None)
+
+    except TelegramError as e:
+        # Handle error, send a custom message to the user if an error occurs
+        error_message = f"Возникла ошибка: {str(e)}"
+        await query.message.reply_html(error_message, disable_web_page_preview=True)
+        await query.edit_message_reply_markup(None)
+
+async def auto_ignore_button(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        await query.edit_message_reply_markup(None)
+
+    except TelegramError as e:
+        # Handle error, send a custom message to the user if an error occurs
+        error_message = f"Возникла ошибка: {str(e)}"
+        await query.message.reply_html(error_message, disable_web_page_preview=True)
+        await query.edit_message_reply_markup(None)
 
 def main():
     print("I'm working")
 
-    application = ApplicationBuilder().token(TOKEN).build()
+    application = ApplicationBuilder().token(TOKEN).arbitrary_callback_data(True).build()
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_member))
-    application.add_handler(CallbackQueryHandler(confirm_button, pattern="Confirmed"))
-    application.add_handler(CallbackQueryHandler(confirm_button, pattern="Declined"))
+    #application.add_handler(CallbackQueryHandler(auto_button_delete, pattern="{chat_id}, {message_id}, {user.id}"))
+    application.add_handler(CallbackQueryHandler(auto_ignore_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
     #application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
