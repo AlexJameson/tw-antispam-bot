@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import json
+sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -51,11 +52,6 @@ class ManualEncoder(json.JSONEncoder):
         if isinstance(obj, DeleteCallbackData):
             return obj.__dict__
         return json.JSONEncoder.default(self, obj)
-class AutoDeleteCallbackData:
-    def __init__(self, chat_id, message_id, user_id):
-        self.chat_id = chat_id
-        self.message_id = message_id
-        self.user_id = user_id
 
 async def handle_new_member(update: Update, context: CallbackContext):
     new_users = update.message.new_chat_members
@@ -117,24 +113,25 @@ async def report_manually(update: Update, context: CallbackContext):
 async def button_delete(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    #callback_data = query.data.split(',')
     data_string = query.data
     callback_data = json.loads(data_string)
-    ci = callback_data.get('ci', 'DefaultCI')
-    mi = callback_data.get('mi', 0)
-    ui = callback_data.get('ui', 0)
-    umi = callback_data.get('umi', 0)
-
-    message_id = mi
-    command_id = umi
-    chat_id_temp = ci
+    chat_id_temp = callback_data.get('ci', 'DefaultCI')
+    message_id = callback_data.get('mi', 0)
+    user_id = callback_data.get('ui', 0)
+    command_id = callback_data.get('umi', 0)
     chat_id=f"-100{chat_id_temp}"
+    
+    if command_id != message_id:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=command_id)
+
+        except TelegramError as e:
+            print(f"Возникла ошибка: {str(e)}")
+        
     try:
         # Attempt to delete message
-        await context.bot.delete_message(chat_id=chat_id, message_id=command_id)
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-        
-        user_id = ui
+
         # Attempt to ban the chat member
         await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
 
@@ -182,9 +179,10 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_critical = len(critical_patterns)
     if num_critical > 0 or num_regular > 2:
         verdict = f"<b>Критические токены:</b> {num_regular}\n<b>Обычные токены:</b> {num_critical}"
-        auto_delete_callback_data = (chat_id, message_id, user.id)
+        callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
+        callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
         keyboard = [
-            [InlineKeyboardButton("Удалить", callback_data=f"{chat_id}, {message_id}, {user.id}"),
+            [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized),
              InlineKeyboardButton("Игнорировать", callback_data='Declined')]
             ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -207,35 +205,6 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML",
                                 reply_markup=reply_markup)
 
-async def auto_button_delete(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    callback_data = query.data.split(',')
-    message_id = callback_data[1].strip()
-    chat_id_temp = str(callback_data[0])
-    chat_id=f"-100{chat_id_temp}"
-    try:
-        # Attempt to delete message
-        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-        
-        user_id = callback_data[2].strip()
-        # Attempt to ban the chat member
-        await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
-
-        user = query.from_user
-        if user.last_name is not None:
-            user_display_name = f"{user.first_name} {user.last_name}"
-        elif user.last_name is None:
-            user_display_name = f"{user.first_name}"
-        user_link = f"https://t.me/{user.username}"
-        await query.message.reply_html(f"<a href='{user_link}'><b>{user_display_name}</b></a> забанил пользователя с ID {user_id}", disable_web_page_preview=True)
-        await query.edit_message_reply_markup(None)
-
-    except TelegramError as e:
-        # Handle error, send a custom message to the user if an error occurs
-        error_message = f"Возникла ошибка: {str(e)}"
-        await query.message.reply_html(error_message, disable_web_page_preview=True)
-        await query.edit_message_reply_markup(None)
 
 async def auto_ignore_button(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -255,10 +224,10 @@ def main():
 
     application = ApplicationBuilder().token(TOKEN).arbitrary_callback_data(True).build()
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_member))
-    #application.add_handler(CallbackQueryHandler(auto_button_delete, pattern="{chat_id}, {message_id}, {user.id}"))
+    #application.add_handler(CallbackQueryHandler(button_delete, pattern="{chat_id}, {message_id}, {user.id}"))
     application.add_handler(CallbackQueryHandler(auto_ignore_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
-    #application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_automatically))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
 
     application.run_polling()
