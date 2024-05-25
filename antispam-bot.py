@@ -2,9 +2,9 @@
 import logging
 import os
 import re
-import sys
 import json
-sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
+import sys
+#sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -22,7 +22,7 @@ load_dotenv()
 
 TOKEN = os.getenv('ANTISPAM_TOKEN')
 TARGET_CHAT = os.getenv('TARGET_GROUP_ID')
-DEBUG_CHAT = os.getenv('DEBUG_CHAT_ID')
+#DEBUG_CHAT = os.getenv('DEBUG_CHAT_ID')
 PRIMARY_ADMIN = os.getenv('PRIMARY_ADMIN')
 BACKUP_ADMIN = os.getenv('BACKUP_ADMIN')
 
@@ -183,14 +183,14 @@ async def check_automatically(update: Update, context: CallbackContext):
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
         keyboard = [
             [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized),
-             InlineKeyboardButton("Игнорировать", callback_data='Declined')]
+             InlineKeyboardButton("Пропустить", callback_data='Declined')]
             ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         if message.text is not None:
             message_text = message.text_html_urled
             text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n"
-            await context.bot.send_message(chat_id=DEBUG_CHAT,
+            await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
                                 parse_mode="HTML",
@@ -198,7 +198,7 @@ async def check_automatically(update: Update, context: CallbackContext):
         elif message.text is None:
             message_text = message.caption_html_urled
             new_caption = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n"
-            await context.bot.copy_message(chat_id=DEBUG_CHAT,
+            await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
                                 caption=new_caption,
@@ -224,7 +224,6 @@ def main():
 
     application = ApplicationBuilder().token(TOKEN).arbitrary_callback_data(True).build()
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_member))
-    #application.add_handler(CallbackQueryHandler(button_delete, pattern="{chat_id}, {message_id}, {user.id}"))
     application.add_handler(CallbackQueryHandler(auto_ignore_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_automatically))
