@@ -135,13 +135,13 @@ async def button_delete(update: Update, context: CallbackContext):
         # Attempt to ban the chat member
         await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
 
-        user = query.from_user
-        if user.last_name is not None:
-            user_display_name = f"{user.first_name} {user.last_name}"
-        elif user.last_name is None:
-            user_display_name = f"{user.first_name}"
-        user_link = f"https://t.me/{user.username}"
-        await query.message.reply_html(f"<a href='{user_link}'><b>{user_display_name}</b></a> забанил пользователя с ID {user_id}", disable_web_page_preview=True)
+        moderator = query.from_user
+        moderator_display_name = f"{moderator.first_name} {moderator.last_name or ''}".strip()
+        moderator_link = f"https://t.me/{moderator.username}"
+        ban_report_message = f"""
+        <a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил пользователя с ID {user_id}
+        """
+        await query.message.reply_html(ban_report_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
 
     except TelegramError as e:
