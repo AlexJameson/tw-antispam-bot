@@ -165,12 +165,9 @@ async def check_automatically(update: Update, context: CallbackContext):
         user_display_name = f"{user.first_name}"
     user_link = f"https://t.me/{user.username}"
     link = f"https://t.me/c/{chat_id}/{message_id}"
-    if message.text is not None:
-        words = message.text
-            
-    elif message.text is None:
-        words = message.caption
-        
+
+    words = message.text or message.caption
+
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
     crit_pattern = '|'.join(map(re.escape, CRITICAL_TOKENS))
     regular_patterns = re.findall(reg_pattern, words)
