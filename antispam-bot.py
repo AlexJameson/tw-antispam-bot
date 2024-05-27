@@ -178,7 +178,10 @@ async def check_automatically(update: Update, context: CallbackContext):
     critical_patterns = re.findall(crit_pattern, words)
     num_critical = len(critical_patterns)
     if num_critical > 0 or num_regular > 2:
-        verdict = f"<b>Критические токены:</b> {num_critical}\n<b>Обычные токены:</b> {num_regular}"
+        verdict = f"""
+        <b>Критические токены:</b> {num_critical}; [ {', '.join(critical_patterns)} ]
+        <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
+        """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
         keyboard = [
