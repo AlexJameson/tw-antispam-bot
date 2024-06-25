@@ -4,14 +4,15 @@ import os
 import re
 import json
 import sys
-#sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
+sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
+import datetime
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from spam_tokens import REGULAR_TOKENS, CRITICAL_TOKENS
+from spam_tokens import REGULAR_TOKENS, CRITICAL_TOKENS, ADULT_TOKENS
 from tinydb import TinyDB, Query
-import datetime
+
 
 logging.basicConfig(level=logging.WARNING, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
@@ -84,15 +85,21 @@ async def report_manually(update: Update, context: CallbackContext):
         
         reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
         crit_pattern = '|'.join(map(re.escape, CRITICAL_TOKENS))
+        adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
         regular_patterns = re.findall(reg_pattern, words)
         num_regular = len(regular_patterns)
         critical_patterns = re.findall(crit_pattern, words)
         num_critical = len(critical_patterns)
-        verdict = f"<b>Критические токены:</b> {num_regular}\n<b>Обычные токены:</b> {num_critical}"
-
+        adult_patterns = re.findall(adult_pattern, words)
+        num_adult = len(adult_patterns)
+        verdict = f"""
+<b>Критические токены:</b> {num_critical}; [ {', '.join(critical_patterns)} ]
+<b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
+<b>18+ токены:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
+        """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
-            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                     text=text_message_content,
                                     disable_web_page_preview=True,
@@ -170,14 +177,19 @@ async def check_automatically(update: Update, context: CallbackContext):
 
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
     crit_pattern = '|'.join(map(re.escape, CRITICAL_TOKENS))
+    adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
     regular_patterns = re.findall(reg_pattern, words)
     num_regular = len(regular_patterns)
     critical_patterns = re.findall(crit_pattern, words)
     num_critical = len(critical_patterns)
-    if num_critical > 0 or num_regular > 2:
+    adult_patterns = re.findall(adult_pattern, words)
+    num_adult = len(adult_patterns)
+
+    if num_critical > 0 or num_regular > 2 or num_adult > 0:
         verdict = f"""
 <b>Критические токены:</b> {num_critical}; [ {', '.join(critical_patterns)} ]
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
+<b>18+ токены:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
@@ -189,7 +201,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
@@ -204,7 +216,27 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 caption=new_caption,
                                 parse_mode="HTML",
                                 reply_markup=reply_markup)
+    # Ban automatically
+    if len(words) < 350 and ("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅')):
+        if message.text is not None:
+            message_text = message.text_html_urled
+            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
 
+            try:
+                await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
+                await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+                await context.bot.send_message(chat_id=TARGET_CHAT,
+                                text=text_message_content,
+                                disable_web_page_preview=True,
+                                parse_mode="HTML")
+
+            except TelegramError as e:
+                # Handle error, send a custom message if an error occurs
+                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+                await context.bot.send_message(chat_id=TARGET_CHAT,
+                                text=error_message,
+                                disable_web_page_preview=True,
+                                parse_mode="HTML")
 
 async def auto_ignore_button(update: Update, context: CallbackContext):
     query = update.callback_query
