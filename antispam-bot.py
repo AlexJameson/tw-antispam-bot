@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from spam_tokens import REGULAR_TOKENS, CRITICAL_TOKENS, ADULT_TOKENS
+from spam_tokens import REGULAR_TOKENS, FINCRYPTO_TOKENS, ADULT_TOKENS, BETTING_TOKENS
 from tinydb import TinyDB, Query
 
 
@@ -77,25 +77,26 @@ async def report_manually(update: Update, context: CallbackContext):
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized)]
         ])
-        if reply_to_message.text is not None:
-            words = reply_to_message.text
-            
-        elif reply_to_message.text is None:
-            words = reply_to_message.caption
+        
+        words = reply_to_message.text or reply_to_message.caption
         
         reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
-        crit_pattern = '|'.join(map(re.escape, CRITICAL_TOKENS))
+        crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
         adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
+        betting_pattern = '|'.join(map(re.escape, BETTING_TOKENS))
         regular_patterns = re.findall(reg_pattern, words)
         num_regular = len(regular_patterns)
-        critical_patterns = re.findall(crit_pattern, words)
-        num_critical = len(critical_patterns)
+        crypto_patterns = re.findall(crypto_pattern, words)
+        num_crypto = len(crypto_patterns)
         adult_patterns = re.findall(adult_pattern, words)
         num_adult = len(adult_patterns)
+        betting_patterns = re.findall(betting_pattern, words)
+        num_betting = len(betting_patterns)
         verdict = f"""
-<b>Критические токены:</b> {num_critical}; [ {', '.join(critical_patterns)} ]
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
-<b>18+ токены:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
+<b>Fincrypto токены:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
+<b>Adult токены:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
+<b>Betting токены:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
         """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
@@ -176,20 +177,24 @@ async def check_automatically(update: Update, context: CallbackContext):
     words = message.text or message.caption
 
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
-    crit_pattern = '|'.join(map(re.escape, CRITICAL_TOKENS))
+    crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
     adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
+    betting_pattern = '|'.join(map(re.escape, BETTING_TOKENS))
     regular_patterns = re.findall(reg_pattern, words)
     num_regular = len(regular_patterns)
-    critical_patterns = re.findall(crit_pattern, words)
-    num_critical = len(critical_patterns)
+    crypto_patterns = re.findall(crypto_pattern, words)
+    num_crypto = len(crypto_patterns)
     adult_patterns = re.findall(adult_pattern, words)
     num_adult = len(adult_patterns)
+    betting_patterns = re.findall(betting_pattern, words)
+    num_betting = len(betting_patterns)
 
-    if num_critical > 0 or num_regular > 2 or num_adult > 0:
+    if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0:
         verdict = f"""
-<b>Критические токены:</b> {num_critical}; [ {', '.join(critical_patterns)} ]
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
-<b>18+ токены:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
+<b>Fincrypto токены:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
+<b>Adult токены:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
+<b>Betting токены:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
@@ -201,7 +206,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
