@@ -92,15 +92,20 @@ async def report_manually(update: Update, context: CallbackContext):
         num_adult = len(adult_patterns)
         betting_patterns = re.findall(betting_pattern, words)
         num_betting = len(betting_patterns)
+		    
+        mixed_words = find_mixed_words(words)
+        num_mixed = len(mixed_words)
+    
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
-<b>Fincrypto токены:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
-<b>Adult токены:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
-<b>Betting токены:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
+<b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
+<b>Ставки:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
         """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
-            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                     text=text_message_content,
                                     disable_web_page_preview=True,
@@ -108,7 +113,7 @@ async def report_manually(update: Update, context: CallbackContext):
                                     reply_markup=keyboard)
         elif reply_to_message.text is None:
             message_text = reply_to_message.caption_html_urled
-            new_caption = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            new_caption = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
             await context.bot.copy_message(chat_id=TARGET_CHAT,
                                     from_chat_id=reply_to_message.chat_id,
                                     message_id=reply_to_message.message_id,
@@ -158,6 +163,14 @@ async def button_delete(update: Update, context: CallbackContext):
         await query.message.reply_html(error_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
 
+def find_mixed_words(text):
+    regex = r"\b(?=[^\s_-]*[а-яА-Я0-9]+)[^\s_-]*[^-\sа-яА-Я0-9\W_]+[^\s_-]*\b"
+	# old regex to only find words containing both Cyrillic and non-Cyrillic characters
+    # regex = r"\b(?=\w*[а-яА-Я]+)(?=\w*[^-_\sа-яА-Я\W]+)\w+\b"
+
+    matches = re.findall(regex, text)
+    return matches
+
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
     #user_id = message.from_user.id
@@ -188,13 +201,17 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_adult = len(adult_patterns)
     betting_patterns = re.findall(betting_pattern, words)
     num_betting = len(betting_patterns)
+    
+    mixed_words = find_mixed_words(words)
+    num_mixed = len(mixed_words)
 
-    if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0:
+    if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 0:
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
-<b>Fincrypto токены:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
-<b>Adult токены:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
-<b>Betting токены:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
+<b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
+<b>Ставки:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
@@ -206,7 +223,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
@@ -214,7 +231,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 reply_markup=reply_markup)
         elif message.text is None:
             message_text = message.caption_html_urled
-            new_caption = f"<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n"
+            new_caption = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n"
             await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
@@ -222,10 +239,10 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML",
                                 reply_markup=reply_markup)
     # Ban automatically
-    if len(words) < 350 and ("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅')):
+    if len(words) < 420 and ("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅')):
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
 
             try:
                 await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
