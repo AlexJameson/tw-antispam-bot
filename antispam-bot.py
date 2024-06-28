@@ -31,7 +31,7 @@ db_file = "./db.json"
 if not os.path.exists(db_file):
     with open(db_file, "w") as file:
         file.write("{}")
-db = TinyDB(db_file)
+db_ignore = TinyDB(db_file)
 
 db_users_file = "./db_users.json"
 if not os.path.exists(db_users_file):
@@ -164,7 +164,7 @@ async def button_delete(update: Update, context: CallbackContext):
         await query.edit_message_reply_markup(None)
 
 def find_mixed_words(text):
-    regex = r"\b(?=[^\s_-]*[а-яА-Я0-9]+)[^\s_-]*[^-\sа-яА-Я0-9\W_]+[^\s_-]*\b"
+    regex = r"\b(?=[^\s_-]*[а-яА-ЯёЁ]+)[^\s_-]*[^-\sа-яА-ЯёЁ\W\d_]+[^\s_-]*\b"
 	# old regex to only find words containing both Cyrillic and non-Cyrillic characters
     # regex = r"\b(?=\w*[а-яА-Я]+)(?=\w*[^-_\sа-яА-Я\W]+)\w+\b"
 
@@ -205,7 +205,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     mixed_words = find_mixed_words(words)
     num_mixed = len(mixed_words)
 
-    if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0:
+    if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 3:
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
@@ -264,13 +264,13 @@ async def auto_ignore_button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
     
-    data_string = query.data
-    callback_data = json.loads(data_string)
-    chat_id_temp = callback_data.get('ci', 'DefaultCI')
-    user_id = callback_data.get('ui', 0)
+    # data_string = query.data
+    # callback_data = json.loads(data_string)
+    # user_id = callback_data.get('ui', 0)
     
     try:
         await query.edit_message_reply_markup(None)
+        # db_ignore.insert({'user_id': user_id})
 
     except TelegramError as e:
         # Handle error, send a custom message to the user if an error occurs
