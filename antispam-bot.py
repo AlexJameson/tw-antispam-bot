@@ -205,7 +205,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     mixed_words = find_mixed_words(words)
     num_mixed = len(mixed_words)
 
-    if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 0:
+    if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0:
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
@@ -263,6 +263,11 @@ async def check_automatically(update: Update, context: CallbackContext):
 async def auto_ignore_button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
+    
+    data_string = query.data
+    callback_data = json.loads(data_string)
+    chat_id_temp = callback_data.get('ci', 'DefaultCI')
+    user_id = callback_data.get('ui', 0)
     
     try:
         await query.edit_message_reply_markup(None)
