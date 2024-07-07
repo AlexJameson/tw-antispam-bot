@@ -205,6 +205,31 @@ async def check_automatically(update: Update, context: CallbackContext):
     mixed_words = find_mixed_words(words)
     num_mixed = len(mixed_words)
 
+    # Ban automatically
+    if len(words) < 420 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅')) or (num_mixed > 3)):
+        if message.text is not None:
+            message_text = message.text_html_urled
+            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+
+            try:
+                await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
+                await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+                await context.bot.send_message(chat_id=TARGET_CHAT,
+                                text=text_message_content,
+                                disable_web_page_preview=True,
+                                parse_mode="HTML")
+                return
+
+            except TelegramError as e:
+                # Handle error, send a custom message if an error occurs
+                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+                await context.bot.send_message(chat_id=TARGET_CHAT,
+                                text=error_message,
+                                disable_web_page_preview=True,
+                                parse_mode="HTML")
+                
+                return
+
     if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 3:
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
@@ -223,7 +248,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"Автоматическое определение спама\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
@@ -238,27 +263,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 caption=new_caption,
                                 parse_mode="HTML",
                                 reply_markup=reply_markup)
-    # Ban automatically
-    if len(words) < 420 and ("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅')):
-        if message.text is not None:
-            message_text = message.text_html_urled
-            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
 
-            try:
-                await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
-                await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-                await context.bot.send_message(chat_id=TARGET_CHAT,
-                                text=text_message_content,
-                                disable_web_page_preview=True,
-                                parse_mode="HTML")
-
-            except TelegramError as e:
-                # Handle error, send a custom message if an error occurs
-                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
-                await context.bot.send_message(chat_id=TARGET_CHAT,
-                                text=error_message,
-                                disable_web_page_preview=True,
-                                parse_mode="HTML")
 
 async def auto_ignore_button(update: Update, context: CallbackContext):
     query = update.callback_query
