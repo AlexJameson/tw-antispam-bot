@@ -212,7 +212,7 @@ async def check_automatically(update: Update, context: CallbackContext):
             verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
             """
-            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
 
             try:
                 await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
@@ -251,7 +251,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"<b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"<b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
