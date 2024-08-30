@@ -4,8 +4,9 @@ import os
 import re
 import json
 import sys
+import pytz
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
-import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -39,7 +40,7 @@ if not os.path.exists(db_users_file):
         users_file.write("{}")
 db_users = TinyDB(db_users_file)
 
-UList = Query()
+User_in_DB = Query()
 
 class DeleteCallbackData:
     def __init__(self, chat_id, message_id, user_id, update_message_id):
@@ -57,7 +58,23 @@ class ManualEncoder(json.JSONEncoder):
 async def handle_new_member(update: Update, context: CallbackContext):
     new_users = update.message.new_chat_members
     for user in new_users:
-       db_users.insert({'user_id': user.id, 'date_joined': str(datetime.datetime.now())})
+       db_users.insert({'user_id': user.id, 'date_joined': str(datetime.now(pytz.utc))})
+    cleanup_old_records()
+
+def cleanup_old_records():
+    # Determine the current date and time
+    now = datetime.now(pytz.utc)
+    
+    # Calculate the boundary date (two weeks ago)
+    four_weeks_ago = now - timedelta(weeks=4)
+    
+    # Query for all records where date_joined is older than two weeks
+    old_records = db_users.search(User_in_DB.date_joined.test(lambda d: datetime.fromisoformat(d) < four_weeks_ago))
+    
+    # Remove these outdated entries
+    for record in old_records:
+        db_users.remove(doc_ids=[record.doc_id])
+
 
 async def report_manually(update: Update, context: CallbackContext):  
     if update.message.reply_to_message:
@@ -79,7 +96,31 @@ async def report_manually(update: Update, context: CallbackContext):
         ])
         
         words = reply_to_message.text or reply_to_message.caption
-        
+
+        # Current time in UTC
+        now = datetime.now(pytz.utc)
+    
+        # Query the database for the user's record
+        user_record = db_users.search(User_in_DB.user_id == user.id)
+
+        if user_record:
+            # There should normally be one record per user, but safety check in case of duplicates
+            date_joined_str = user_record[0].get('date_joined')
+            if date_joined_str:
+                date_joined = datetime.fromisoformat(date_joined_str)
+                # Calculate the time difference
+                delta = now - date_joined
+                # Check if the user joined within the last 5 days
+                if delta <= timedelta(days=5):
+                    recent_joiner = True
+                else:
+                    recent_joiner = False
+            else:
+                recent_joiner = False
+        else:
+            recent_joiner = False  # No record found, likely an error or first time chat entry not captured.
+
+
         reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
         crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
         adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
@@ -102,6 +143,7 @@ async def report_manually(update: Update, context: CallbackContext):
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>Вступил менее 5 дней назад:</b> {recent_joiner}
         """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
@@ -173,8 +215,6 @@ def find_mixed_words(text):
 
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
-    #user_id = message.from_user.id
-    #if db.search(UList.user_id == user_id):
 
     numeric_chat_id = message.chat.id
     chat_id = str(numeric_chat_id).replace("-100", "")
@@ -188,6 +228,29 @@ async def check_automatically(update: Update, context: CallbackContext):
     link = f"https://t.me/c/{chat_id}/{message_id}"
 
     words = message.text or message.caption
+
+    # Current time in UTC
+    now = datetime.now(pytz.utc)
+    
+    # Query the database for the user's record
+    user_record = db_users.search(User_in_DB.user_id == user.id)
+
+    if user_record:
+        # There should normally be one record per user, but safety check in case of duplicates
+        date_joined_str = user_record[0].get('date_joined')
+        if date_joined_str:
+            date_joined = datetime.fromisoformat(date_joined_str)
+            # Calculate the time difference
+            delta = now - date_joined
+            # Check if the user joined within the last 5 days
+            if delta <= timedelta(days=5):
+                recent_joiner = True
+            else:
+                recent_joiner = False
+        else:
+            recent_joiner = False
+    else:
+        recent_joiner = False  # No record found, likely an error or first time chat entry not captured.
 
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
     crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
@@ -206,12 +269,15 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_mixed = len(mixed_words)
 
     # Ban automatically
-    if len(words) < 420 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or ("TONCOIN" and "казино" in words)) or (num_mixed > 3)):
+    if len(words) < 500 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or (num_betting > 1)) or (num_mixed > 3)):
+        if "#вакансия" in words:
+            return
         if message.text is not None:
             message_text = message.text_html_urled
             verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Вступил менее 5 дней назад:</b> {recent_joiner}
             """
             text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
 
@@ -226,7 +292,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
             except TelegramError as e:
                 # Handle error, send a custom message if an error occurs
-                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}"
+                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
                 await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=error_message,
                                 disable_web_page_preview=True,
@@ -234,13 +300,16 @@ async def check_automatically(update: Update, context: CallbackContext):
                 
                 return
 
-    if num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 3:
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 3) and (len(words) < 500):
+        if "#вакансия" in words:
+            return
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>Вступил менее 5 дней назад:</b> {recent_joiner}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
