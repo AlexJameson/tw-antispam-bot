@@ -40,7 +40,10 @@ ADULT_TOKENS = {
 BETTING_TOKENS = {
 	'ставк',
 	'букмекер',
-	'выигрыш'
+	'выигрыш',
+	'казино',
+	'TONCOIN',
+	'депозит'
 }
 
 FINCRYPTO_TOKENS = {

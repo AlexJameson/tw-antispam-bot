@@ -100,7 +100,7 @@ async def report_manually(update: Update, context: CallbackContext):
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
-<b>Ставки:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
         """
         if reply_to_message.text is not None:
@@ -206,11 +206,12 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_mixed = len(mixed_words)
 
     # Ban automatically
-    if len(words) < 420 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅')) or (num_mixed > 3)):
+    if len(words) < 420 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or ("TONCOIN" and "казино" in words)) or (num_mixed > 3)):
         if message.text is not None:
             message_text = message.text_html_urled
             verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
             """
             text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
 
@@ -225,7 +226,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
             except TelegramError as e:
                 # Handle error, send a custom message if an error occurs
-                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}"
                 await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=error_message,
                                 disable_web_page_preview=True,
@@ -238,7 +239,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
-<b>Ставки:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
