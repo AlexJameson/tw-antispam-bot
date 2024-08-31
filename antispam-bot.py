@@ -101,25 +101,19 @@ async def report_manually(update: Update, context: CallbackContext):
         now = datetime.now(pytz.utc)
     
         # Query the database for the user's record
-        user_record = db_users.search(User_in_DB.user_id == user.id)
+        user_records = db_users.search(User_in_DB.user_id == user.id)
 
-        if user_record:
-            # There should normally be one record per user, but safety check in case of duplicates
-            date_joined_str = user_record[0].get('date_joined')
-            if date_joined_str:
-                date_joined = datetime.fromisoformat(date_joined_str)
-                # Calculate the time difference
-                delta = now - date_joined
-                # Check if the user joined within the last 5 days
-                if delta <= timedelta(days=5):
-                    recent_joiner = True
-                else:
-                    recent_joiner = False
-            else:
-                recent_joiner = False
+        if user_records:
+            # Sort records by date_joined from earliest to latest and select the first (earliest) one
+            earliest_record = sorted(user_records, key=lambda x: x['date_joined'])[0]
+            date_joined_str = earliest_record['date_joined']
+            date_joined = datetime.fromisoformat(date_joined_str)
+            delta = now - date_joined
+        
+            # Check if the user joined within the last 5 days
+            recent_joiner = delta <= timedelta(days=5)
         else:
             recent_joiner = False  # No record found, likely an error or first time chat entry not captured.
-
 
         reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
         crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
@@ -155,7 +149,7 @@ async def report_manually(update: Update, context: CallbackContext):
                                     reply_markup=keyboard)
         elif reply_to_message.text is None:
             message_text = reply_to_message.caption_html_urled
-            new_caption = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            new_caption = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
             await context.bot.copy_message(chat_id=TARGET_CHAT,
                                     from_chat_id=reply_to_message.chat_id,
                                     message_id=reply_to_message.message_id,
@@ -181,7 +175,9 @@ async def button_delete(update: Update, context: CallbackContext):
             await context.bot.delete_message(chat_id=chat_id, message_id=command_id)
 
         except TelegramError as e:
-            print(f"Возникла ошибка: {str(e)}")
+            error_message = f"Возникла ошибка: {str(e)}"
+            await query.message.reply_html(error_message, disable_web_page_preview=True)
+            await query.edit_message_reply_markup(None)
         
     try:
         # Attempt to delete message
@@ -207,7 +203,7 @@ async def button_delete(update: Update, context: CallbackContext):
 
 def find_mixed_words(text):
     regex = r"\b(?=[^\s_-]*[а-яА-ЯёЁ]+)[^\s_-]*[^-\sа-яА-ЯёЁ\W\d_]+[^\s_-]*\b"
-	# old regex to only find words containing both Cyrillic and non-Cyrillic characters
+	 # old regex to only find words containing both Cyrillic and non-Cyrillic characters
     # regex = r"\b(?=\w*[а-яА-Я]+)(?=\w*[^-_\sа-яА-Я\W]+)\w+\b"
 
     matches = re.findall(regex, text)
@@ -215,7 +211,6 @@ def find_mixed_words(text):
 
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
-
     numeric_chat_id = message.chat.id
     chat_id = str(numeric_chat_id).replace("-100", "")
     message_id = message.message_id
@@ -228,27 +223,21 @@ async def check_automatically(update: Update, context: CallbackContext):
     link = f"https://t.me/c/{chat_id}/{message_id}"
 
     words = message.text or message.caption
-
     # Current time in UTC
     now = datetime.now(pytz.utc)
     
     # Query the database for the user's record
-    user_record = db_users.search(User_in_DB.user_id == user.id)
+    user_records = db_users.search(User_in_DB.user_id == user.id)
 
-    if user_record:
-        # There should normally be one record per user, but safety check in case of duplicates
-        date_joined_str = user_record[0].get('date_joined')
-        if date_joined_str:
-            date_joined = datetime.fromisoformat(date_joined_str)
-            # Calculate the time difference
-            delta = now - date_joined
-            # Check if the user joined within the last 5 days
-            if delta <= timedelta(days=5):
-                recent_joiner = True
-            else:
-                recent_joiner = False
-        else:
-            recent_joiner = False
+    if user_records:
+        # Sort records by date_joined from earliest to latest and select the first (earliest) one
+        earliest_record = sorted(user_records, key=lambda x: x['date_joined'])[0]
+        date_joined_str = earliest_record['date_joined']
+        date_joined = datetime.fromisoformat(date_joined_str)
+        delta = now - date_joined
+
+        # Check if the user joined within the last 5 days
+        recent_joiner = delta <= timedelta(days=5)
     else:
         recent_joiner = False  # No record found, likely an error or first time chat entry not captured.
 
@@ -269,7 +258,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_mixed = len(mixed_words)
 
     # Ban automatically
-    if len(words) < 500 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or (num_betting > 1)) or (num_mixed > 3)):
+    if len(words) < 500 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 3)):
         if "#вакансия" in words:
             return
         if message.text is not None:
@@ -300,7 +289,37 @@ async def check_automatically(update: Update, context: CallbackContext):
                 
                 return
 
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 3) and (len(words) < 500):
+        elif message.text is None:
+            message_text = message.caption_html_urled
+            verdict = f"""
+<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Вступил менее 5 дней назад:</b> {recent_joiner}
+            """
+            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+            new_caption = f"{text_message_content}\n<a href='{link}'>Открыть в чате</a>\n\n"
+            
+            try:
+                await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
+                await context.bot.copy_message(chat_id=TARGET_CHAT,
+                                from_chat_id=message.chat_id,
+                                message_id=message.message_id,
+                                caption=new_caption,
+                                parse_mode="HTML")
+                await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
+                return
+
+            except TelegramError as e:
+                # Handle error, send a custom message if an error occurs
+                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+                await context.bot.copy_message(chat_id=TARGET_CHAT,
+                                from_chat_id=message.chat_id,
+                                message_id=message.message_id,
+                                caption=error_message,
+                                parse_mode="HTML")
+                return
+
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0) and (len(words) < 500):
         if "#вакансия" in words:
             return
         verdict = f"""
@@ -337,7 +356,6 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML",
                                 reply_markup=reply_markup)
 
-
 async def auto_ignore_button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
@@ -363,7 +381,7 @@ def main():
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_member))
     application.add_handler(CallbackQueryHandler(auto_ignore_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_automatically))
+    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
 
     application.run_polling()
