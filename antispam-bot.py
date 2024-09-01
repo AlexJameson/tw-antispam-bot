@@ -14,7 +14,6 @@ from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, Ca
 from spam_tokens import REGULAR_TOKENS, FINCRYPTO_TOKENS, ADULT_TOKENS, BETTING_TOKENS
 from tinydb import TinyDB, Query
 
-
 logging.basicConfig(level=logging.WARNING, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
                     filename="bot.log",
@@ -24,7 +23,6 @@ load_dotenv()
 
 TOKEN = os.getenv('ANTISPAM_TOKEN')
 TARGET_CHAT = os.getenv('TARGET_GROUP_ID')
-#DEBUG_CHAT = os.getenv('DEBUG_CHAT_ID')
 PRIMARY_ADMIN = os.getenv('PRIMARY_ADMIN')
 BACKUP_ADMIN = os.getenv('BACKUP_ADMIN')
 
@@ -58,23 +56,17 @@ class ManualEncoder(json.JSONEncoder):
 async def handle_new_member(update: Update, context: CallbackContext):
     new_users = update.message.new_chat_members
     for user in new_users:
-       db_users.insert({'user_id': user.id, 'date_joined': str(datetime.now(pytz.utc))})
+       db_users.insert({'user_id': user.id, 'date_joined': datetime.now(pytz.utc).date().isoformat()})
     cleanup_old_records()
 
 def cleanup_old_records():
-    # Determine the current date and time
-    now = datetime.now(pytz.utc)
-    
-    # Calculate the boundary date (two weeks ago)
-    four_weeks_ago = now - timedelta(weeks=4)
-    
-    # Query for all records where date_joined is older than two weeks
-    old_records = db_users.search(User_in_DB.date_joined.test(lambda d: datetime.fromisoformat(d) < four_weeks_ago))
-    
-    # Remove these outdated entries
+    now = datetime.now(pytz.utc).date()
+    two_weeks_ago = now - timedelta(weeks=2)
+    old_records = db_users.search(User_in_DB.date_joined.test(
+        lambda d: datetime.fromisoformat(d).date() < two_weeks_ago
+    ))
     for record in old_records:
         db_users.remove(doc_ids=[record.doc_id])
-
 
 async def report_manually(update: Update, context: CallbackContext):  
     if update.message.reply_to_message:
@@ -97,23 +89,19 @@ async def report_manually(update: Update, context: CallbackContext):
         
         words = reply_to_message.text or reply_to_message.caption
 
-        # Current time in UTC
-        now = datetime.now(pytz.utc)
-    
-        # Query the database for the user's record
+        now = datetime.now(pytz.utc).date()
+
         user_records = db_users.search(User_in_DB.user_id == user.id)
 
         if user_records:
-            # Sort records by date_joined from earliest to latest and select the first (earliest) one
             earliest_record = sorted(user_records, key=lambda x: x['date_joined'])[0]
-            date_joined_str = earliest_record['date_joined']
-            date_joined = datetime.fromisoformat(date_joined_str)
+            date_joined = datetime.fromisoformat(earliest_record['date_joined']).date()
             delta = now - date_joined
-        
-            # Check if the user joined within the last 5 days
             recent_joiner = delta <= timedelta(days=5)
+            delta_debug = delta.days
         else:
             recent_joiner = False  # No record found, likely an error or first time chat entry not captured.
+            delta_debug = "Cannot access delta value"
 
         reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
         crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
@@ -138,6 +126,7 @@ async def report_manually(update: Update, context: CallbackContext):
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Вступил менее 5 дней назад:</b> {recent_joiner}
+<b>Дебаг:</b> {user_records} | Delta (days): {delta_debug}
         """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
@@ -223,24 +212,21 @@ async def check_automatically(update: Update, context: CallbackContext):
     link = f"https://t.me/c/{chat_id}/{message_id}"
 
     words = message.text or message.caption
-    # Current time in UTC
-    now = datetime.now(pytz.utc)
-    
-    # Query the database for the user's record
+    now = datetime.now(pytz.utc).date()
+
     user_records = db_users.search(User_in_DB.user_id == user.id)
 
     if user_records:
-        # Sort records by date_joined from earliest to latest and select the first (earliest) one
         earliest_record = sorted(user_records, key=lambda x: x['date_joined'])[0]
-        date_joined_str = earliest_record['date_joined']
-        date_joined = datetime.fromisoformat(date_joined_str)
+        date_joined = datetime.fromisoformat(earliest_record['date_joined']).date()
         delta = now - date_joined
+        delta_debug = delta.days
 
-        # Check if the user joined within the last 5 days
         recent_joiner = delta <= timedelta(days=5)
     else:
         recent_joiner = False  # No record found, likely an error or first time chat entry not captured.
-
+        delta_debug = "Cannot access delta value"
+        
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
     crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
     adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
@@ -259,15 +245,16 @@ async def check_automatically(update: Update, context: CallbackContext):
 
     # Ban automatically
     if len(words) < 500 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 3)):
+        verdict = f"""
+<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Вступил менее 5 дней назад:</b> {recent_joiner}
+<b>Дебаг:</b> {user_records} | Delta (days): {delta_debug}
+            """
         if "#вакансия" in words:
             return
         if message.text is not None:
             message_text = message.text_html_urled
-            verdict = f"""
-<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Вступил менее 5 дней назад:</b> {recent_joiner}
-            """
             text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
 
             try:
@@ -291,11 +278,6 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         elif message.text is None:
             message_text = message.caption_html_urled
-            verdict = f"""
-<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Вступил менее 5 дней назад:</b> {recent_joiner}
-            """
             text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
             new_caption = f"{text_message_content}\n<a href='{link}'>Открыть в чате</a>\n\n"
             
@@ -329,6 +311,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Вступил менее 5 дней назад:</b> {recent_joiner}
+<b>Дебаг:</b> {user_records} | Delta (days): {delta_debug}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
