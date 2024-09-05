@@ -4,6 +4,7 @@ import os
 import re
 import json
 import sys
+import asyncio
 import pytz
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
 from datetime import datetime, timedelta
@@ -90,6 +91,8 @@ async def report_manually(update: Update, context: CallbackContext):
         words = reply_to_message.text or reply_to_message.caption
 
         now = datetime.now(pytz.utc).date()
+
+        await asyncio.sleep(2)
 
         user_records = db_users.search(User_in_DB.user_id == user.id)
 
@@ -213,6 +216,8 @@ async def check_automatically(update: Update, context: CallbackContext):
 
     words = message.text or message.caption
     now = datetime.now(pytz.utc).date()
+
+    await asyncio.sleep(2)
 
     user_records = db_users.search(User_in_DB.user_id == user.id)
 
