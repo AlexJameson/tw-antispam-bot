@@ -57,7 +57,7 @@ class ManualEncoder(json.JSONEncoder):
 async def handle_new_member(update: Update, context: CallbackContext):
     new_users = update.message.new_chat_members
     for user in new_users:
-       db_users.insert({'user_id': user.id, 'date_joined': datetime.now(pytz.utc).date().isoformat()})
+       db_users.insert({'user_id': user.id, 'date_joined': datetime.now(pytz.utc).date().isoformat(), 'username': user.username})
     cleanup_old_records()
 
 def cleanup_old_records():
@@ -92,7 +92,7 @@ async def report_manually(update: Update, context: CallbackContext):
 
         now = datetime.now(pytz.utc).date()
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(5)
 
         user_records = db_users.search(User_in_DB.user_id == user.id)
 
