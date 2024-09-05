@@ -217,7 +217,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     words = message.text or message.caption
     now = datetime.now(pytz.utc).date()
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(5)
 
     user_records = db_users.search(User_in_DB.user_id == user.id)
 
