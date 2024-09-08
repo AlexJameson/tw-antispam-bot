@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
+from datetime import datetime
 import logging
 import os
 import re
 import json
 import sys
-import asyncio
-import pytz
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
-from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -33,12 +31,6 @@ if not os.path.exists(db_file):
         file.write("{}")
 db_ignore = TinyDB(db_file)
 
-db_users_file = "./db_users.json"
-if not os.path.exists(db_users_file):
-    with open(db_users_file, "w") as users_file:
-        users_file.write("{}")
-db_users = TinyDB(db_users_file)
-
 User_in_DB = Query()
 
 class DeleteCallbackData:
@@ -54,20 +46,13 @@ class ManualEncoder(json.JSONEncoder):
             return obj.__dict__
         return json.JSONEncoder.default(self, obj)
 
+user_data = {}
+
 async def handle_new_member(update: Update, context: CallbackContext):
     new_users = update.message.new_chat_members
     for user in new_users:
-       db_users.insert({'user_id': user.id, 'date_joined': datetime.now(pytz.utc).date().isoformat(), 'username': user.username})
-    cleanup_old_records()
-
-def cleanup_old_records():
-    now = datetime.now(pytz.utc).date()
-    two_weeks_ago = now - timedelta(weeks=2)
-    old_records = db_users.search(User_in_DB.date_joined.test(
-        lambda d: datetime.fromisoformat(d).date() < two_weeks_ago
-    ))
-    for record in old_records:
-        db_users.remove(doc_ids=[record.doc_id])
+        join_time = datetime.now()
+        user_data[user.id] = {'join_time': join_time}
 
 async def report_manually(update: Update, context: CallbackContext):  
     if update.message.reply_to_message:
@@ -90,21 +75,20 @@ async def report_manually(update: Update, context: CallbackContext):
         
         words = reply_to_message.text or reply_to_message.caption
 
-        now = datetime.now(pytz.utc).date()
+        is_first_message = False
+        debug_message = "Not found in the dictionary."
 
-        await asyncio.sleep(5)
+        if user.id in user_data:
+            message_time = datetime.now()
+            formatted_message_time = message_time.strftime("%H:%M:%S")
+            join_time = user_data[user.id]['join_time']
+            formatted_join_time = join_time.strftime("%H:%M:%S")
+            time_delta = message_time - join_time
+            formatted_time_delta = str(time_delta).split('.')[0]
 
-        user_records = db_users.search(User_in_DB.user_id == user.id)
-
-        if user_records:
-            earliest_record = sorted(user_records, key=lambda x: x['date_joined'])[0]
-            date_joined = datetime.fromisoformat(earliest_record['date_joined']).date()
-            delta = now - date_joined
-            recent_joiner = delta <= timedelta(days=5)
-            delta_debug = delta.days
-        else:
-            recent_joiner = False  # No record found, likely an error or first time chat entry not captured.
-            delta_debug = "Cannot access delta value"
+            time_delta = message_time - join_time
+            debug_message = f"UID: {user.id} | Joined: {formatted_join_time} | Sent message: {formatted_message_time} | Delta: {formatted_time_delta}"
+            is_first_message = True
 
         reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
         crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
@@ -128,9 +112,11 @@ async def report_manually(update: Update, context: CallbackContext):
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>Вступил менее 5 дней назад:</b> {recent_joiner}
-<b>Дебаг:</b> {user_records} | Delta (days): {delta_debug}
+<b>is_first_message:</b> {is_first_message}
+<b>Дебаг:</b> {debug_message}
         """
+        if user.id in user_data:
+            del user_data[user.id]
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
             text_message_content = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
@@ -215,22 +201,21 @@ async def check_automatically(update: Update, context: CallbackContext):
     link = f"https://t.me/c/{chat_id}/{message_id}"
 
     words = message.text or message.caption
-    now = datetime.now(pytz.utc).date()
 
-    await asyncio.sleep(5)
+    is_first_message = False
+    debug_message = "Not found in the dictionary."
 
-    user_records = db_users.search(User_in_DB.user_id == user.id)
+    if user.id in user_data:
+        message_time = datetime.now()
+        formatted_message_time = message_time.strftime("%H:%M:%S")
+        join_time = user_data[user.id]['join_time']
+        formatted_join_time = join_time.strftime("%H:%M:%S")
+        time_delta = message_time - join_time
+        formatted_time_delta = str(time_delta).split('.')[0]
 
-    if user_records:
-        earliest_record = sorted(user_records, key=lambda x: x['date_joined'])[0]
-        date_joined = datetime.fromisoformat(earliest_record['date_joined']).date()
-        delta = now - date_joined
-        delta_debug = delta.days
-
-        recent_joiner = delta <= timedelta(days=5)
-    else:
-        recent_joiner = False  # No record found, likely an error or first time chat entry not captured.
-        delta_debug = "Cannot access delta value"
+        time_delta = message_time - join_time
+        debug_message = f"UID: {user.id} | Joined: {formatted_join_time} | Sent message: {formatted_message_time} | Delta: {formatted_time_delta}"
+        is_first_message = True
         
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
     crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
@@ -253,9 +238,12 @@ async def check_automatically(update: Update, context: CallbackContext):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Вступил менее 5 дней назад:</b> {recent_joiner}
-<b>Дебаг:</b> {user_records} | Delta (days): {delta_debug}
+<b>is_first_message:</b> {is_first_message}
+<b>Дебаг:</b> {debug_message}
             """
+        if user.id in user_data:
+            del user_data[user.id]
+		  
         if "#вакансия" in words:
             return
         if message.text is not None:
@@ -315,9 +303,11 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>Вступил менее 5 дней назад:</b> {recent_joiner}
-<b>Дебаг:</b> {user_records} | Delta (days): {delta_debug}
+<b>is_first_message:</b> {is_first_message}
+<b>Дебаг:</b> {debug_message}
         """
+        if user.id in user_data:
+            del user_data[user.id]
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
         keyboard = [
@@ -348,13 +338,8 @@ async def auto_ignore_button(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
     
-    # data_string = query.data
-    # callback_data = json.loads(data_string)
-    # user_id = callback_data.get('ui', 0)
-    
     try:
         await query.edit_message_reply_markup(None)
-        # db_ignore.insert({'user_id': user_id})
 
     except TelegramError as e:
         # Handle error, send a custom message to the user if an error occurs
