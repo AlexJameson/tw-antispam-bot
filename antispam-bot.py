@@ -55,7 +55,7 @@ async def show_stats(update: Update, context: CallbackContext):
     stats_list = db_stat.search(Stats.type == 'statistics')
     if stats_list:
         stats = stats_list[0]
-        message = f"Starting from Sep 9, 2024:\n\nChecked automatically: {stats['checked_automatically']}\nTotal banned (inc auto): {stats['banned_total']}\nAutomatically banned: {stats['banned_auto']}\nIgnored: {stats['ignored']}"
+        message = f"Starting from Sep 9, 2024:\n\nAutomatically checked: {stats['checked_automatically']}\nTotal banned (inc auto): {stats['banned_total']}\nAutomatically banned: {stats['banned_auto']}\nIgnored: {stats['ignored']}"
         await update.message.reply_text(message)
     else:
         await update.message.reply_text("No statistics found.")
@@ -348,7 +348,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 reply_markup=reply_markup)
         elif message.text is None:
             message_text = message.caption_html_urled
-            new_caption = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n\n{verdict}\n\n<a href='{link}'>Открыть в чате</a>\n\n"
+            new_caption = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n"
             await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
