@@ -6,6 +6,7 @@ import re
 import json
 import sys
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
+import asyncio
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -87,21 +88,6 @@ async def report_manually(update: Update, context: CallbackContext):
         
         words = reply_to_message.text or reply_to_message.caption
 
-        is_first_message = False
-        debug_message = "Not found in the dictionary."
-
-        if user.id in user_data:
-            message_time = datetime.now()
-            formatted_message_time = message_time.strftime("%H:%M:%S")
-            join_time = user_data[user.id]['join_time']
-            formatted_join_time = join_time.strftime("%H:%M:%S")
-            time_delta = message_time - join_time
-            formatted_time_delta = str(time_delta).split('.')[0]
-
-            time_delta = message_time - join_time
-            debug_message = f"UID: {user.id} | Joined: {formatted_join_time} | Sent message: {formatted_message_time} | Delta: {formatted_time_delta}"
-            is_first_message = True
-
         reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
         crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
         adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
@@ -124,11 +110,7 @@ async def report_manually(update: Update, context: CallbackContext):
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>is_first_message:</b> {is_first_message}
-<b>Дебаг:</b> {debug_message}
         """
-        if user.id in user_data:
-            del user_data[user.id]
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
             text_message_content = f"👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
@@ -216,14 +198,11 @@ async def check_automatically(update: Update, context: CallbackContext):
     link = f"https://t.me/c/{chat_id}/{message_id}"
 
     words = message.text or message.caption
-    
-    stats_list = db_stat.search(Stats.type == 'statistics')
-    if stats_list:
-        stats = stats_list[0]
-        db_stat.update({'checked_automatically': stats['checked_automatically'] + 1}, Stats.type == 'statistics')
 
     is_first_message = False
     debug_message = "Not found in the dictionary."
+    
+    await asyncio.sleep(5)
 
     if user.id in user_data:
         message_time = datetime.now()
@@ -252,6 +231,11 @@ async def check_automatically(update: Update, context: CallbackContext):
     
     mixed_words = find_mixed_words(words)
     num_mixed = len(mixed_words)
+
+    stats_list = db_stat.search(Stats.type == 'statistics')
+    if stats_list:
+        stats = stats_list[0]
+        db_stat.update({'checked_automatically': stats['checked_automatically'] + 1}, Stats.type == 'statistics')
 
     # Ban automatically
     if len(words) < 500 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 3)):
