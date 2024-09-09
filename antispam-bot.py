@@ -25,14 +25,6 @@ TARGET_CHAT = os.getenv('TARGET_GROUP_ID')
 PRIMARY_ADMIN = os.getenv('PRIMARY_ADMIN')
 BACKUP_ADMIN = os.getenv('BACKUP_ADMIN')
 
-db_file = "./db.json"
-if not os.path.exists(db_file):
-    with open(db_file, "w") as file:
-        file.write("{}")
-db_ignore = TinyDB(db_file)
-
-User_in_DB = Query()
-
 class DeleteCallbackData:
     def __init__(self, chat_id, message_id, user_id, update_message_id):
         self.ci = chat_id
@@ -47,6 +39,26 @@ class ManualEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 user_data = {}
+
+db_stat_file = "./statistics.json"
+if not os.path.exists(db_stat_file):
+    with open(db_stat_file, "w") as file:
+        file.write("{}")
+db_stat = TinyDB(db_stat_file)
+
+Stats = Query()
+
+if not db_stat.search(Stats.type == 'statistics'):
+    db_stat.insert({'type': 'statistics', 'banned_total': 0, 'banned_auto': 0, 'ignored': 0, 'checked_automatically': 0})
+
+async def show_stats(update: Update, context: CallbackContext):
+    stats_list = db_stat.search(Stats.type == 'statistics')
+    if stats_list:
+        stats = stats_list[0]
+        message = f"Starting from Sep 9, 2024:\n\nChecked automatically: {stats['checked_automatically']}\nTotal banned (inc auto): {stats['banned_total']}\nAutomatically banned: {stats['banned_auto']}\nIgnored: {stats['ignored']}"
+        await update.message.reply_text(message)
+    else:
+        await update.message.reply_text("No statistics found.")
 
 async def handle_new_member(update: Update, context: CallbackContext):
     new_users = update.message.new_chat_members
@@ -158,10 +170,8 @@ async def button_delete(update: Update, context: CallbackContext):
             await query.edit_message_reply_markup(None)
         
     try:
-        # Attempt to delete message
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
 
-        # Attempt to ban the chat member
         await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
 
         moderator = query.from_user
@@ -172,6 +182,11 @@ async def button_delete(update: Update, context: CallbackContext):
         """
         await query.message.reply_html(ban_report_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
+        
+        stats_list = db_stat.search(Stats.type == 'statistics')
+        if stats_list:
+            stats = stats_list[0]
+            db_stat.update({'banned_total': stats['banned_total'] + 1}, Stats.type == 'statistics')
 
     except TelegramError as e:
         # Handle error, send a custom message to the user if an error occurs
@@ -201,6 +216,11 @@ async def check_automatically(update: Update, context: CallbackContext):
     link = f"https://t.me/c/{chat_id}/{message_id}"
 
     words = message.text or message.caption
+    
+    stats_list = db_stat.search(Stats.type == 'statistics')
+    if stats_list:
+        stats = stats_list[0]
+        db_stat.update({'checked_automatically': stats['checked_automatically'] + 1}, Stats.type == 'statistics')
 
     is_first_message = False
     debug_message = "Not found in the dictionary."
@@ -257,6 +277,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 text=text_message_content,
                                 disable_web_page_preview=True,
                                 parse_mode="HTML")
+                db_stat.update({'banned_auto': stats['banned_auto'] + 1, 'banned_total': stats['banned_total'] + 1}, Stats.type == 'statistics')
                 return
 
             except TelegramError as e:
@@ -282,6 +303,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 caption=new_caption,
                                 parse_mode="HTML")
                 await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
+                db_stat.update({'banned_auto': stats['banned_auto'] + 1, 'banned_total': stats['banned_total'] + 1}, Stats.type == 'statistics')
                 return
 
             except TelegramError as e:
@@ -340,6 +362,11 @@ async def auto_ignore_button(update: Update, context: CallbackContext):
     
     try:
         await query.edit_message_reply_markup(None)
+        
+        stats_list = db_stat.search(Stats.type == 'statistics')
+        if stats_list:
+            stats = stats_list[0]
+            db_stat.update({'ignored': stats['ignored'] + 1}, Stats.type == 'statistics')
 
     except TelegramError as e:
         # Handle error, send a custom message to the user if an error occurs
@@ -356,6 +383,7 @@ def main():
     application.add_handler(CallbackQueryHandler(button_delete))
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
+    application.add_handler(CommandHandler("stats", show_stats))
 
     application.run_polling()
 
