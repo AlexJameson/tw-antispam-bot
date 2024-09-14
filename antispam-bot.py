@@ -6,7 +6,6 @@ import re
 import json
 import sys
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
-import asyncio
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -39,8 +38,6 @@ class ManualEncoder(json.JSONEncoder):
             return obj.__dict__
         return json.JSONEncoder.default(self, obj)
 
-user_data = {}
-
 db_stat_file = "./statistics.json"
 if not os.path.exists(db_stat_file):
     with open(db_stat_file, "w") as file:
@@ -60,12 +57,6 @@ async def show_stats(update: Update, context: CallbackContext):
         await update.message.reply_text(message)
     else:
         await update.message.reply_text("No statistics found.")
-
-async def handle_new_member(update: Update, context: CallbackContext):
-    new_users = update.message.new_chat_members
-    for user in new_users:
-        join_time = datetime.now()
-        user_data[user.id] = {'join_time': join_time}
 
 async def report_manually(update: Update, context: CallbackContext):  
     if update.message.reply_to_message:
@@ -184,6 +175,20 @@ def find_mixed_words(text):
     matches = re.findall(regex, text)
     return matches
 
+def is_spam_message(text):
+    # Extended regex explained:
+    # - (ищу людей|ищу партнеров|ищу партнёров) matches any of the starting phrases.
+    # - .*? means any characters (non-greedily matched) following the starting phrase.
+    # - The group (?: ... | ... | ...) contains different phrases to match later in the message.
+    spam_pattern = re.compile(
+        r"(набираю\s+команду|набираем\s+команду|ищу\s+людей|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров).*?("
+        r"в\s+команду|для\s+заработка|личные\s+сообщения|в лс|л\.с|л\. с|"
+        r"доход|доходы|дохода|заработок|заработка|прибыль|прибыли|занятость"
+        r")",
+        re.IGNORECASE | re.DOTALL
+    )
+    return spam_pattern.search(text)
+
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
     numeric_chat_id = message.chat.id
@@ -198,23 +203,6 @@ async def check_automatically(update: Update, context: CallbackContext):
     link = f"https://t.me/c/{chat_id}/{message_id}"
 
     words = message.text or message.caption
-
-    is_first_message = False
-    debug_message = "Not found in the dictionary."
-    
-    await asyncio.sleep(5)
-
-    if user.id in user_data:
-        message_time = datetime.now()
-        formatted_message_time = message_time.strftime("%H:%M:%S")
-        join_time = user_data[user.id]['join_time']
-        formatted_join_time = join_time.strftime("%H:%M:%S")
-        time_delta = message_time - join_time
-        formatted_time_delta = str(time_delta).split('.')[0]
-
-        time_delta = message_time - join_time
-        debug_message = f"UID: {user.id} | Joined: {formatted_join_time} | Sent message: {formatted_message_time} | Delta: {formatted_time_delta}"
-        is_first_message = True
         
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
     crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
@@ -231,6 +219,11 @@ async def check_automatically(update: Update, context: CallbackContext):
     
     mixed_words = find_mixed_words(words)
     num_mixed = len(mixed_words)
+    
+    spam_tokens = is_spam_message(words)
+    if spam_tokens:
+        spam_tokens_string = spam_tokens.group()
+    else: spam_tokens_string = None
 
     stats_list = db_stat.search(Stats.type == 'statistics')
     if stats_list:
@@ -238,21 +231,15 @@ async def check_automatically(update: Update, context: CallbackContext):
         db_stat.update({'checked_automatically': stats['checked_automatically'] + 1}, Stats.type == 'statistics')
 
     # Ban automatically
-    if len(words) < 500 and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 3)):
+    if (len(words) < 400 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 3 or spam_tokens is not None)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>is_first_message:</b> {is_first_message}
-<b>Дебаг:</b> {debug_message}
+<b>Новая регулярка:</b> {spam_tokens is not None} | {spam_tokens_string}
             """
-        if user.id in user_data:
-            del user_data[user.id]
-		  
-        if "#вакансия" in words:
-            return
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"<b>!!! Lord Protector автоматически забанил пользователя !!!</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+            text_message_content = f"<b>╭∩╮( •̀_•́ )╭∩╮ Автоматический бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
 
             try:
                 await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
@@ -300,7 +287,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML")
                 return
 
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0) and (len(words) < 500):
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0) and (len(words) < 400):
         if "#вакансия" in words:
             return
         verdict = f"""
@@ -309,11 +296,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>is_first_message:</b> {is_first_message}
-<b>Дебаг:</b> {debug_message}
         """
-        if user.id in user_data:
-            del user_data[user.id]
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
         keyboard = [
@@ -353,7 +336,6 @@ async def auto_ignore_button(update: Update, context: CallbackContext):
             db_stat.update({'ignored': stats['ignored'] + 1}, Stats.type == 'statistics')
 
     except TelegramError as e:
-        # Handle error, send a custom message to the user if an error occurs
         error_message = f"Возникла ошибка: {str(e)}"
         await query.message.reply_html(error_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
@@ -362,7 +344,6 @@ def main():
     print("I'm working")
 
     application = ApplicationBuilder().token(TOKEN).arbitrary_callback_data(True).build()
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_member))
     application.add_handler(CallbackQueryHandler(auto_ignore_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, check_automatically))
