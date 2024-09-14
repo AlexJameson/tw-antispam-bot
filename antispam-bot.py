@@ -53,7 +53,8 @@ async def show_stats(update: Update, context: CallbackContext):
     stats_list = db_stat.search(Stats.type == 'statistics')
     if stats_list:
         stats = stats_list[0]
-        message = f"Starting from Sep 9, 2024:\n\nAutomatically checked: {stats['checked_automatically']}\nTotal banned (inc auto): {stats['banned_total']}\nAutomatically banned: {stats['banned_auto']}\nIgnored: {stats['ignored']}"
+        auto_ban_rate = int(stats['banned_auto']) / int(stats['banned_total']) * 100
+        message = f"Starting from Sep 15, 2024:\n\nAutomatically checked: {stats['checked_automatically']}\nTotal banned (including auto): {stats['banned_total']}\nAutomatically banned: {stats['banned_auto']}\nAuto ban rate: {int(auto_ban_rate)}%"
         await update.message.reply_text(message)
     else:
         await update.message.reply_text("No statistics found.")
