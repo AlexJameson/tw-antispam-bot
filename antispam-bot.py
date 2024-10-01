@@ -190,6 +190,16 @@ def is_spam_message(text):
     )
     return spam_pattern.search(text)
 
+def test_is_spam_message(text):
+    spam_pattern = re.compile(
+        r"(набираю\s+команду|набираем\s+команду|набираем\s+людей|набор|ищу\s+людей|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров|идет\s+набор|идёт\s+набор\s+людей|в\s+поиске\s+людей|амбициозного|амбициозных|удалённый\s+заработок|ответственные\s+люди|срочно требуются|заработка).*?(" 
+        r"в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|в\s+лс|л\.с|л\. с|"
+        r"доход|доходы|дохода|заработок|заработка|ежедневный\s+доход|прибыль|прибыли|занятость"
+        r"|[\+\-]?\s*(\d+\s*)(долларов|день|USD|$|20+|18+|от\s+18|от\s+20)?)",
+        re.IGNORECASE | re.DOTALL
+    )
+    return spam_pattern.search(text)
+
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
     numeric_chat_id = message.chat.id
@@ -226,12 +236,17 @@ async def check_automatically(update: Update, context: CallbackContext):
         spam_tokens_string = spam_tokens.group()
     else: spam_tokens_string = None
 
+    test_spam_tokens = test_is_spam_message(words)
+    if test_spam_tokens:
+        test_spam_tokens_string = test_spam_tokens.group()
+    else: test_spam_tokens_string = None
+
     stats_list = db_stat.search(Stats.type == 'statistics')
     if stats_list:
         stats = stats_list[0]
 
     # Ban automatically
-    if (len(words) < 400 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 3 or spam_tokens is not None)):
+    if (len(words) < 500 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 3 or spam_tokens is not None)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
@@ -287,15 +302,10 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML")
                 return
 
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0) and (len(words) < 400):
-        if "#вакансия" in words:
-            return
+    # if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0) and (len(words) < 500) and not "#вакансия" in words:
+    if test_spam_tokens is not None and len(words) < 500 and not "#вакансия" in words:
         verdict = f"""
-<b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
-<b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
-<b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
-<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>Тестовая регулярка:</b> {test_spam_tokens is not None} | {test_spam_tokens_string}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
