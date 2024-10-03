@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from datetime import datetime
+import datetime
 import logging
 import os
 import re
@@ -46,18 +46,51 @@ db_stat = TinyDB(db_stat_file)
 
 Stats = Query()
 
-if not db_stat.search(Stats.type == 'statistics'):
-    db_stat.insert({'type': 'statistics', 'banned_total': 0, 'banned_auto': 0, 'ignored': 0, 'checked_automatically': 0})
-
-async def show_stats(update: Update, context: CallbackContext):
-    stats_list = db_stat.search(Stats.type == 'statistics')
-    if stats_list:
-        stats = stats_list[0]
-        auto_ban_rate = int(stats['banned_auto']) / int(stats['banned_total']) * 100
-        message = f"Starting from Sep 15, 2024:\n\nTotal banned (including auto): {stats['banned_total']}\nAutomatically banned: {stats['banned_auto']}\nAuto ban rate: {int(auto_ban_rate)}%"
-        await update.message.reply_text(message)
+async def show_stats(update, context):
+    # Capturing the command arguments for time period
+    period = 'all'
+    if context.args:
+        period = context.args[0]  # assuming the first argument is the period
+    
+    # Determining the start date based on the period
+    now = datetime.datetime.now()
+    if period == 'week':
+        start_date = now - datetime.timedelta(days=7)
+    elif period == 'month':
+        start_date = now - datetime.timedelta(days=30)  # approximating a month
+    elif period == 'quarter':
+        start_date = now - datetime.timedelta(days=90)  # approximating a quarter
     else:
-        await update.message.reply_text("No statistics found.")
+        start_date = None  # For all-time stats
+
+    if start_date:
+        # Filter bans based on the start date
+        bans = db_stat.search((Stats.type == 'ban') & (Stats.timestamp.test(lambda x: datetime.datetime.strptime(x, "%Y-%m-%d %H:%M:%S") >= start_date)))
+    else:
+        # Get all ban records
+        bans = db_stat.search(Stats.type == 'ban')
+    
+    # Aggregate results by 'method'
+    ban_count = {}
+    for ban in bans:
+        method = ban['method']
+        if method in ban_count:
+            ban_count[method] += 1
+        else:
+            ban_count[method] = 1
+            
+    total_bans = len(bans)
+    auto_bans = ban_count.get('auto', 0)
+
+    # Constructing the message
+    if total_bans > 0:
+        auto_ban_rate = (auto_bans / total_bans) * 100
+        message = f"(Test) Statistics for '{period}':\n\nTotal bans: {total_bans}\nAutomatically banned: {auto_bans}\nAuto ban rate: {int(auto_ban_rate)}%"
+    else:
+        message = f"No bans recorded for the period '{period}'."
+    
+    # Replying to the message
+    await update.message.reply_text(message)
 
 async def report_manually(update: Update, context: CallbackContext):  
     if update.message.reply_to_message:
@@ -156,11 +189,13 @@ async def button_delete(update: Update, context: CallbackContext):
         """
         await query.message.reply_html(ban_report_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
-        
-        stats_list = db_stat.search(Stats.type == 'statistics')
-        if stats_list:
-            stats = stats_list[0]
-            db_stat.update({'banned_total': stats['banned_total'] + 1}, Stats.type == 'statistics')
+            
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        db_stat.insert({
+            'type': 'ban',
+            'method': 'manual',
+            'timestamp': current_time
+        })
 
     except TelegramError as e:
         # Handle error, send a custom message to the user if an error occurs
@@ -176,11 +211,8 @@ def find_mixed_words(text):
     matches = re.findall(regex, text)
     return matches
 
-def is_spam_message(text):
-    # Extended regex explained:
-    # - (ищу людей|ищу партнеров|ищу партнёров) matches any of the starting phrases.
-    # - .*? means any characters (non-greedily matched) following the starting phrase.
-    # - The group (?: ... | ... | ...) contains different phrases to match later in the message.
+def test_is_spam_message(text):
+    # For test purposes
     spam_pattern = re.compile(
         r"(набираю\s+команду|набираем\s+команду|ищу\s+людей|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров).*?("
         r"в\s+команду|для\s+заработка|личные\s+сообщения|в лс|л\.с|л\. с|"
@@ -190,7 +222,7 @@ def is_spam_message(text):
     )
     return spam_pattern.search(text)
 
-def test_is_spam_message(text):
+def is_spam_message(text):
     spam_pattern = re.compile(
         r"(набираю\s+команду|набираем\s+команду|набираем\s+людей|набор|ищу\s+людей|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров|идет\s+набор|идёт\s+набор\s+людей|в\s+поиске\s+людей|амбициозного|амбициозных|удалённый\s+заработок|ответственные\s+люди|срочно требуются|заработка).*?(" 
         r"в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|в\s+лс|л\.с|л\. с|"
@@ -241,12 +273,8 @@ async def check_automatically(update: Update, context: CallbackContext):
         test_spam_tokens_string = test_spam_tokens.group()
     else: test_spam_tokens_string = None
 
-    stats_list = db_stat.search(Stats.type == 'statistics')
-    if stats_list:
-        stats = stats_list[0]
-
     # Ban automatically
-    if (len(words) < 500 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 3 or spam_tokens is not None)):
+    if (len(words) < 500 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 2 or spam_tokens is not None)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
@@ -263,7 +291,14 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 text=text_message_content,
                                 disable_web_page_preview=True,
                                 parse_mode="HTML")
-                db_stat.update({'banned_auto': stats['banned_auto'] + 1, 'banned_total': stats['banned_total'] + 1}, Stats.type == 'statistics')
+                
+                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                db_stat.insert({
+                    'type': 'ban',
+                    'method': 'auto',
+                    'timestamp': current_time
+                })
+
                 return
 
             except TelegramError as e:
@@ -289,7 +324,14 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 caption=new_caption,
                                 parse_mode="HTML")
                 await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
-                db_stat.update({'banned_auto': stats['banned_auto'] + 1, 'banned_total': stats['banned_total'] + 1}, Stats.type == 'statistics')
+                
+                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                db_stat.insert({
+                    'type': 'ban',
+                    'method': 'auto',
+                    'timestamp': current_time
+                })
+
                 return
 
             except TelegramError as e:
@@ -302,10 +344,14 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML")
                 return
 
-    # if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0) and (len(words) < 500) and not "#вакансия" in words:
-    if test_spam_tokens is not None and len(words) < 500 and not "#вакансия" in words:
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1) and (len(words) < 500) and not "#вакансия" in words:
+    # if test_spam_tokens is not None and len(words) < 500 and not "#вакансия" in words:
         verdict = f"""
-<b>Тестовая регулярка:</b> {test_spam_tokens is not None} | {test_spam_tokens_string}
+<b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
+<b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
+<b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
+<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
@@ -339,11 +385,6 @@ async def auto_ignore_button(update: Update, context: CallbackContext):
     
     try:
         await query.edit_message_reply_markup(None)
-        
-        stats_list = db_stat.search(Stats.type == 'statistics')
-        if stats_list:
-            stats = stats_list[0]
-            db_stat.update({'ignored': stats['ignored'] + 1}, Stats.type == 'statistics')
 
     except TelegramError as e:
         error_message = f"Возникла ошибка: {str(e)}"

@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 
 statistics.json
+old-statistics.json
