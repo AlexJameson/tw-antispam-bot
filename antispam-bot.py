@@ -6,6 +6,7 @@ import re
 import json
 import sys
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
+from is_spam_message import new_is_spam_message
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -212,20 +213,9 @@ def find_mixed_words(text):
     return matches
 
 def test_is_spam_message(text):
-    # For test purposes
     spam_pattern = re.compile(
-        r"(набираю\s+команду|набираем\s+команду|ищу\s+людей|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров).*?("
-        r"в\s+команду|для\s+заработка|личные\s+сообщения|в лс|л\.с|л\. с|"
-        r"доход|доходы|дохода|заработок|заработка|прибыль|прибыли|занятость"
-        r")",
-        re.IGNORECASE | re.DOTALL
-    )
-    return spam_pattern.search(text)
-
-def is_spam_message(text):
-    spam_pattern = re.compile(
-        r"(набираю\s+команду|набираем\s+команду|набираем\s+людей|набор|ищу\s+людей|нужны\s+люди|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров|идет\s+набор|идёт\s+набор\s+людей|в\s+поиске\s+людей|амбициозного|амбициозных|удалённый\s+заработок|ответственные\s+люди|срочно\s+требуются|заработка|20\s+минут|хороший\s+доход|пассивный\s+заработок|необходимость\s+в\s+новых\s+партнерах|первые\s+хорошие\s+деньги|бинанс|байбит|Okx|mexc|JetTon|приумножить\s+свои\s+средства|не\s+выходя\s+из\s+дому|не\s+выходя\s+из\s+дома|занятость\s+с\s+хорошим\s+доходом|с\s+хорошей\s+прибылью|приятная\s+прибыль|удаленная\s+сфера|удаленное\s+сотрудничество|для\s+удаленной\s+работы|по\s+пассивному\s+заработку|доп\s+доход|аирдропы|тестнеты|лаунчпады|в\s+дополнительном\s+заработке|направление\s+для\s+сотрудничества|удаленную\s+занятость|на\s+удаленной\s+основе|опыт\s+не\s+важен|в\s+сфере\s+криптовалюты).*?(" 
-        r"пассивный\s+заработок|в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|в\s+лс|л\.с|л\.\s+с|в\s+лс\s+за\s+деталями|за\s+деталями\s+в\s+лс|за\s+деталями\s+пиши|1-2\s+часа\s+в\s+день|вывод\s+средств|с\s+телефона"
+        r"(набираю\s+команду|набираем\s+команду|набираем\s+людей|набор|ищу\s+людей|нужны\s+люди|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров|идет\s+набор|идёт\s+набор\s+людей|в\s+поиске\s+людей|амбициозного|амбициозных|удалённый\s+заработок|ответственные\s+люди|срочно\s+требуются|заработка|20\s+минут|хороший\s+доход|пассивный\s+заработок|необходимость\s+в\s+новых\s+партнерах|первые\s+хорошие\s+деньги|бинанс|байбит|Okx|mexc|JetTon|приумножить\s+свои\s+средства|не\s+выходя\s+из\s+дому|не\s+выходя\s+из\s+дома|занятость\s+с\s+хорошим\s+доходом|с\s+хорошей\s+прибылью|приятная\s+прибыль|удаленная\s+сфера|удаленное\s+сотрудничество|для\s+удаленной\s+работы|по\s+пассивному\s+заработку|доп\s+доход|аирдропы|тестнеты|лаунчпады|в\s+дополнительном\s+заработке|направление\s+для\s+сотрудничества|удаленную\s+занятость|на\s+удаленной\s+основе|опыт\s+не\s+важен|в\s+сфере\s+криптовалют|нужен\s+только\s+телефон|возможность\s+зарабатывать\s+онлайн|можно\s+с\s+телефона|хороший\s+заработок|часов\s+в\s+день|опыт\s+не\s+требуется).*?(" 
+        r"пассивный\s+заработок|в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|в\s+лс|л\.с|л\.\s+с|в\s+лс\s+за\s+деталями|за\s+деталями\s+в\s+лс|за\s+деталями\s+пиши|1-2\s+часа\s+в\s+день|вывод\s+средств|с\s+телефона|пассивный\s+заработок|в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|пишите\s+в\s+личку|для\s+подробностей\s+пиши|в\s+лс|л\.с|л\.\s+с|в\s+лс\s+за\s+деталями|за\s+деталями\s+в\s+лс|за\s+деталями\s+пиши|1-2\s+часа\s+в\s+день|вывод\s+средств|пишите\s+мне|в\s+личных\s+сообщениях|"
         r"доход|доходы|дохода|заработок|заработка|ежедневный\s+доход|прибыль|прибыли|занятость"
         r"|[\+\-]?\s*(\d+\s*)(долларов|день|USD|$|20+|18+|от\s+18|от\s+20|от\s+25|ОТ\s+18|с\s+18)?)",
         re.IGNORECASE | re.DOTALL
@@ -263,22 +253,17 @@ async def check_automatically(update: Update, context: CallbackContext):
     mixed_words = find_mixed_words(words)
     num_mixed = len(mixed_words)
     
-    spam_tokens = is_spam_message(words)
+    spam_tokens = test_is_spam_message(words)
     if spam_tokens:
         spam_tokens_string = spam_tokens.group()
     else: spam_tokens_string = None
-
-    test_spam_tokens = test_is_spam_message(words)
-    if test_spam_tokens:
-        test_spam_tokens_string = test_spam_tokens.group()
-    else: test_spam_tokens_string = None
 
     # Ban automatically
     if (len(words) < 500 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 2 or spam_tokens is not None)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Новая регулярка:</b> {spam_tokens is not None} | {spam_tokens_string}
+<b>Регулярка:</b> {spam_tokens is not None} | {spam_tokens_string}
             """
         if message.text is not None:
             message_text = message.text_html_urled
@@ -344,14 +329,24 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML")
                 return
 
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1) and (len(words) < 500) and not "#вакансия" in words:
-    # if test_spam_tokens is not None and len(words) < 500 and not "#вакансия" in words:
+    #if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1) and (len(words) < 500) and not "#вакансия" in words:
+    test_spam_tokens = new_is_spam_message(words)
+    if test_spam_tokens:
+        test_spam_tokens_string = test_spam_tokens.group()
+    else: test_spam_tokens_string = None
+
+    if test_spam_tokens is not None and len(words) < 500 and not "#вакансия" in words:
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+        """
+        test_verdict = f"""
+<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
+<b>Тестовая регулярка (2024-10-17):</b> {test_spam_tokens is not None} | {test_spam_tokens_string}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
@@ -363,7 +358,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>"
+            text_message_content = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{test_verdict}\n<a href='{link}'>Открыть в чате</a>"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
@@ -371,7 +366,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 reply_markup=reply_markup)
         elif message.text is None:
             message_text = message.caption_html_urled
-            new_caption = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n"
+            new_caption = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{test_verdict}\n<a href='{link}'>Открыть в чате</a>\n\n"
             await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
