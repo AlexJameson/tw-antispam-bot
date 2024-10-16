@@ -224,8 +224,8 @@ def test_is_spam_message(text):
 
 def is_spam_message(text):
     spam_pattern = re.compile(
-        r"(набираю\s+команду|набираем\s+команду|набираем\s+людей|набор|ищу\s+людей|нужны\s+люди|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров|идет\s+набор|идёт\s+набор\s+людей|в\s+поиске\s+людей|амбициозного|амбициозных|удалённый\s+заработок|ответственные\s+люди|срочно\s+требуются|заработка|20\s+минут|хороший\s+доход|пассивный\s+заработок|необходимость\s+в\s+новых\s+партнерах|первые\s+хорошие\s+деньги|бинанс|байбит|Okx|mexc|JetTon|приумножить\s+свои\s+средства|не\s+выходя\s+из\s+дому|не\s+выходя\s+из\s+дома|занятость\s+с\s+хорошим\s+доходом|с\s+хорошей\s+прибылью|приятная\s+прибыль|удаленная\s+сфера|удаленное\s+сотрудничество|для\s+удаленной\s+работы|по\s+пассивному\s+заработку|доп\s+доход|аирдропы|тестнеты|лаунчпады|в\s+дополнительном\s+заработке|направление\s+для\s+сотрудничества|удаленную\s+занятость|на\s+удаленной\s+основе|опыт\s+не\s+важен|в\s+сфере\s+криптовалюты).*?(" 
-        r"пассивный\s+заработок|в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|в\s+лс|л\.с|л\.\s+с|в\s+лс\s+за\s+деталями|за\s+деталями\s+в\s+лс|за\s+деталями\s+пиши|1-2\s+часа\s+в\s+день|вывод\s+средств|с\s+телефона"
+        r"(набираю\s+команду|набираем\s+команду|набираем\s+людей|набор|ищу\s+людей|нужны\s+люди|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров|идет\s+набор|идёт\s+набор\s+людей|в\s+поиске\s+людей|амбициозного|амбициозных|удалённый\s+заработок|ответственные\s+люди|срочно\s+требуются|заработка|20\s+минут|хороший\s+доход|пассивный\s+заработок|необходимость\s+в\s+новых\s+партнерах|первые\s+хорошие\s+деньги|бинанс|байбит|Okx|mexc|JetTon|приумножить\s+свои\s+средства|не\s+выходя\s+из\s+дому|не\s+выходя\s+из\s+дома|занятость\s+с\s+хорошим\s+доходом|с\s+хорошей\s+прибылью|приятная\ы+прибыль|удаленная\s+сфера).*?(" 
+        r"пассивный\s+заработок|в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|в\s+лс|л\.с|л\.\s+с|в\s+лс\s+за\s+деталями|за\s+деталями\s+в\s+лс|за\s+деталями\s+пиши|1-2\s+часа\s+в\s+день|вывод\s+средств"
         r"доход|доходы|дохода|заработок|заработка|ежедневный\s+доход|прибыль|прибыли|занятость"
         r"|[\+\-]?\s*(\d+\s*)(долларов|день|USD|$|20+|18+|от\s+18|от\s+20|от\s+25|ОТ\s+18|с\s+18)?)",
         re.IGNORECASE | re.DOTALL
@@ -391,25 +391,15 @@ async def auto_ignore_button(update: Update, context: CallbackContext):
         await query.message.reply_html(error_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
 
-async def delete_stories(update: Update, context: CallbackContext):
-    message = update.message
-    if message.story:
-        try:
-            await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
-            print(f"Deleted a story from {message.from_user.id}")
-        except TelegramError as e:
-            print(f"Возникла ошибка при удалении истории: {str(e)}")
-
 def main():
     print("I'm working")
 
     application = ApplicationBuilder().token(TOKEN).arbitrary_callback_data(True).build()
     application.add_handler(CallbackQueryHandler(auto_ignore_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
-    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND & ~filters.STORY, check_automatically))
+    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
     application.add_handler(CommandHandler("stats", show_stats))
-    application.add_handler(MessageHandler(filters.STORY, delete_stories))
 
     application.run_polling()
 
