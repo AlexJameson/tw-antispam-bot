@@ -253,7 +253,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     mixed_words = find_mixed_words(words)
     num_mixed = len(mixed_words)
     
-    spam_tokens = test_is_spam_message(words)
+    spam_tokens = new_is_spam_message(words)
     if spam_tokens:
         spam_tokens_string = spam_tokens.group()
     else: spam_tokens_string = None
@@ -263,7 +263,8 @@ async def check_automatically(update: Update, context: CallbackContext):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Регулярка:</b> {spam_tokens is not None} | {spam_tokens_string}
+<b>Регулярка(2024-10-20):</b> {spam_tokens is not None}
+<b>is_premium:</b> {user.is_premium}
             """
         if message.text is not None:
             message_text = message.text_html_urled
@@ -329,24 +330,14 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML")
                 return
 
-    #if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1) and (len(words) < 500) and not "#вакансия" in words:
-    test_spam_tokens = new_is_spam_message(words)
-    if test_spam_tokens:
-        test_spam_tokens_string = test_spam_tokens.group()
-    else: test_spam_tokens_string = None
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1) and (len(words) < 500) and not "#вакансия" in words:
 
-    if test_spam_tokens is not None and len(words) < 500 and not "#вакансия" in words:
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-        """
-        test_verdict = f"""
-<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Тестовая регулярка (2024-10-17):</b> {test_spam_tokens is not None} | {test_spam_tokens_string}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
@@ -358,7 +349,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{test_verdict}\n<a href='{link}'>Открыть в чате</a>"
+            text_message_content = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
@@ -366,7 +357,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 reply_markup=reply_markup)
         elif message.text is None:
             message_text = message.caption_html_urled
-            new_caption = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{test_verdict}\n<a href='{link}'>Открыть в чате</a>\n\n"
+            new_caption = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n"
             await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
