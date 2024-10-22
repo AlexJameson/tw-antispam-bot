@@ -56,10 +56,6 @@ async def show_stats(update, context):
     
     # Determining the start date based on the period
     now = datetime.datetime.now()
-    if period == 'day':
-        start_date = now - datetime.timedelta(hours=24)
-    if period == '3days':
-        start_date = now - datetime.timedelta(hours=72)
     if period == 'week':
         start_date = now - datetime.timedelta(days=7)
     elif period == 'month':
