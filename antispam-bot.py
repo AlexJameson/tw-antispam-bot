@@ -56,6 +56,10 @@ async def show_stats(update, context):
     
     # Determining the start date based on the period
     now = datetime.datetime.now()
+    if period == 'day':
+        start_date = now - datetime.timedelta(days=1)
+    if period == '3days':
+        start_date = now - datetime.timedelta(days=3)
     if period == 'week':
         start_date = now - datetime.timedelta(days=7)
     elif period == 'month':
@@ -405,7 +409,7 @@ def main():
     application.add_handler(CommandHandler("stats", show_stats))
     application.add_handler(MessageHandler(filters.STORY, delete_stories))
 
-    application.run_polling()
+    application.run_polling(allowed_updates=True)
 
 if __name__ == '__main__':
     main()
