@@ -7,7 +7,7 @@ import json
 import sys
 import emoji
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
-from is_spam_message import new_is_spam_message
+from is_spam_message import new_is_spam_message, has_critical_patterns
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -259,9 +259,11 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_mixed = len(mixed_words)
     
     spam_tokens = new_is_spam_message(words)
-    if spam_tokens:
-        spam_tokens_string = spam_tokens.group()
-    else: spam_tokens_string = None
+    crit_tokens = has_critical_patterns(words)
+    crit_tokens_bool = crit_tokens is not None
+    if crit_tokens:
+        crit_tokens_string = crit_tokens.group()
+    else: crit_tokens_string = None
     
     emoji_num = sum(1 for _ in emoji.emoji_list(words))
     if emoji_num > 12:
@@ -270,11 +272,12 @@ async def check_automatically(update: Update, context: CallbackContext):
         emoji_critical_num = False
 
     # Ban automatically
-    if (len(words) < 500 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or num_betting > 1 or num_mixed > 2 or spam_tokens is not None or emoji_critical_num is True)):
+    if (len(words) < 500 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or crit_tokens_bool is True or num_betting > 1 or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Регулярка(2024-10-20):</b> {spam_tokens is not None}
+<b>Критические токены(2024-10-23):</b> {crit_tokens_bool} | {crit_tokens_string}
 <b>is_premium:</b> {user.is_premium}
 <b>More than 12 emojis:</b> {emoji_critical_num}
             """
@@ -342,6 +345,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 parse_mode="HTML")
                 return
 
+    # suggestion mode
     if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1) and (len(words) < 500) and not "#вакансия" in words:
 
         verdict = f"""
