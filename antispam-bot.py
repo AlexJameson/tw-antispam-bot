@@ -240,6 +240,9 @@ async def check_automatically(update: Update, context: CallbackContext):
     user_link = f"https://t.me/{user.username}"
     link = f"https://t.me/c/{chat_id}/{message_id}"
 
+    if message.text is None and message.caption is None:
+        return
+
     words = message.text or message.caption
         
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
@@ -314,15 +317,14 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         elif message.text is None:
             message_text = message.caption_html_urled
-            text_message_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
-            new_caption = f"{text_message_content}\n<a href='{link}'>Открыть в чате</a>\n\n"
+            caption_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
             
             try:
                 await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
                 await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
-                                caption=new_caption,
+                                caption=caption_content,
                                 parse_mode="HTML")
                 await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
                 

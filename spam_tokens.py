@@ -38,6 +38,7 @@ BETTING_TOKENS = {
 	'казино',
 	'Казино',
 	'TONCOIN',
+	'NOTCOIN',
 	'депозит'
 }
 
