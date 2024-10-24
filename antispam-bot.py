@@ -275,7 +275,7 @@ async def check_automatically(update: Update, context: CallbackContext):
         emoji_critical_num = False
 
     # Ban automatically
-    if (len(words) < 500 and not "#вакансия" in words) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or crit_tokens_bool is True or num_betting > 1 or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
+    if (len(words) < 500 and (not "#вакансия" in words or not "#подработка")) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or crit_tokens_bool is True or num_betting > 1 or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
