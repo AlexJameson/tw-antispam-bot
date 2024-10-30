@@ -7,7 +7,7 @@ import json
 import sys
 import emoji
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
-from is_spam_message import new_is_spam_message, has_critical_patterns, find_mixed_words
+from is_spam_message import new_is_spam_message, has_critical_patterns, has_mixed_words
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -132,7 +132,7 @@ async def report_manually(update: Update, context: CallbackContext):
         betting_patterns = re.findall(betting_pattern, words)
         num_betting = len(betting_patterns)
 		    
-        mixed_words = find_mixed_words(words)
+        mixed_words = has_mixed_words(words)
         num_mixed = len(mixed_words)
     
         verdict = f"""
@@ -250,7 +250,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     betting_patterns = re.findall(betting_pattern, words)
     num_betting = len(betting_patterns)
     
-    mixed_words = find_mixed_words(words)
+    mixed_words = has_mixed_words(words)
     num_mixed = len(mixed_words)
     
     spam_tokens = new_is_spam_message(words)
