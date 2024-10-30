@@ -7,7 +7,7 @@ import json
 import sys
 import emoji
 sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
-from is_spam_message import new_is_spam_message, has_critical_patterns
+from is_spam_message import new_is_spam_message, has_critical_patterns, find_mixed_words
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -208,14 +208,6 @@ async def button_delete(update: Update, context: CallbackContext):
         error_message = f"Возникла ошибка: {str(e)}"
         await query.message.reply_html(error_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
-
-def find_mixed_words(text):
-    regex = r"\b(?=[^\s_-]*[а-яА-ЯёЁ]+)[^\s_-]*[^-\sа-яА-ЯёЁ\W\d_]+[^\s_-]*\b"
-	 # old regex to only find words containing both Cyrillic and non-Cyrillic characters
-    # regex = r"\b(?=\w*[а-яА-Я]+)(?=\w*[^-_\sа-яА-Я\W]+)\w+\b"
-
-    matches = re.findall(regex, text)
-    return matches
 
 def test_is_spam_message(text):
     spam_pattern = re.compile(

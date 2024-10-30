@@ -86,6 +86,8 @@ def new_is_spam_message(text):
         r"\bамбициозного\s+человека\b",
         r"\bамбициозных\s+людей\b",
         r"\bлюдей\s+в\s+команду\b",
+        r"\bчастичная\s*занятость\b",
+        r"\bинтересная\s*занятость\b",
         
         # Earnings patterns
         r"\bпассивный\s+источник\s+дохода\b",
@@ -154,6 +156,10 @@ def new_is_spam_message(text):
         r"\bслив\s+фото",
         r"\bсливы\b",
         r"\bслив\b"
+        
+		  # Gambling
+        r"\bбукмекер\b"
+	     r"\bвыигрыш\b"
     ]
 
     supporting_phrases = [
@@ -194,11 +200,8 @@ def new_is_spam_message(text):
         
         # Time commitment patterns
         r"\b\d+(-\d+)?\s*час(?:а|ов)?\s+в\s+день\b",
-        r"\b1-2\s*часа?\s*работы\b",
-        r"\b2-3\s*часа\s*в\s*день\b",
+        r"\b\d+(-\d+)?\s*час(?:а|ов)?\s+работы\b",
         r"\bдо\s+\d+\s*час(?:а|ов)?\s+в\s+день\b",
-        r"\bчастичная\s*занятость\b",
-        r"\bинтересная\s*занятость\b",
 
         # Age restriction patterns
         r"[\+\-]?\s*\d+\s*(долларов|день|usd|\$)",
@@ -224,3 +227,9 @@ def new_is_spam_message(text):
 
     #return has_main and has_supporting 
     return main_pattern.search(text) and supporting_pattern.search(text)
+
+def find_mixed_words(text):
+    regex = r"\b(?=[^\s_-]*[а-яА-ЯёЁ]+)[^\s_-]*[^-\sа-яА-ЯёЁ\W\d_]+[^\s_-]*\b"
+
+    matches = re.findall(regex, text)
+    return matches
