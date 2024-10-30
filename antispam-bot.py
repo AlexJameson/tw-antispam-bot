@@ -273,16 +273,16 @@ async def check_automatically(update: Update, context: CallbackContext):
         emoji_critical_num = True
     else:
         emoji_critical_num = False
+        
+    user_is_premium = user.is_premium
 
     # Ban automatically
-    if (len(words) < 500 and (not "#вакансия" in words or not "#подработка" in words)) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or crit_tokens_bool is True or num_betting > 1 or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
+    if (len(words) < 500 and (not "#вакансия" in words or not "#подработка" in words)) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or (crit_tokens_bool is True and user_is_premium is True) or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Регулярка(2024-10-20):</b> {spam_tokens is not None}
-<b>Критические токены(2024-10-23):</b> {crit_tokens_bool} | {crit_tokens_string}
-<b>is_premium:</b> {user.is_premium}
-<b>More than 12 emojis:</b> {emoji_critical_num}
+<b>Основная регулярка:</b> {spam_tokens is not None}
+<b>Критические токены (+is_premium):</b> {crit_tokens_bool} | {crit_tokens_string}
+<b>Более 12 эмодзи:</b> {emoji_critical_num}
             """
         if message.text is not None:
             message_text = message.text_html_urled
