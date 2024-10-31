@@ -267,6 +267,7 @@ async def check_automatically(update: Update, context: CallbackContext):
         emoji_critical_num = False
         
     user_is_premium = user.is_premium
+    is_reply = message.reply_to_message is not None
 
     # Ban automatically
     if (len(words) < 500 and (not "#вакансия" in words or not "#подработка" in words)) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or (crit_tokens_bool is True and user_is_premium is True) or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
@@ -275,6 +276,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>Основная регулярка:</b> {spam_tokens is not None}
 <b>Критические токены (+is_premium):</b> {crit_tokens_bool} | {crit_tokens_string}
 <b>Более 12 эмодзи:</b> {emoji_critical_num}
+<b>Является ответом:</b> {is_reply}
             """
         if message.text is not None:
             message_text = message.text_html_urled
@@ -348,6 +350,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>Является ответом:</b> {is_reply}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
