@@ -284,6 +284,7 @@ async def check_automatically(update: Update, context: CallbackContext):
         emoji_critical_num = False
         
     repeated_emojis = check_repeated_emojis(words)
+    repeated_emojis_bool = repeated_emojis is not None
         
     user_is_premium = user.is_premium
     is_reply = message.reply_to_message is not None
@@ -295,7 +296,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>Основная регулярка:</b> {spam_tokens is not None}
 <b>Критические токены (+is_premium):</b> {crit_tokens_string}
 <b>Более 12 эмодзи:</b> {emoji_critical_num}
-<b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis}
+<b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis_bool}
             """
         if message.text is not None:
             message_text = message.text_html_urled
@@ -361,7 +362,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                 return
 
     # suggestion mode
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis is not None) and (len(words) < 500) and (not "#вакансия" or "#подработка" in words):
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 500) and (not "#вакансия" or "#подработка" in words):
 
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
