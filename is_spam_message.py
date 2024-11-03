@@ -40,8 +40,9 @@ def has_critical_patterns(text):
         r"jeton_games",
         r"slotston_bot",
         r"\bтелеграм\s+бот\s+казино\b",
-        r"\b\w*казино\s+JetTon\b",
-        r"\b\w*казино\s+TONCOIN\b",
+        r"\bказинобот\w*",
+        r"\w*казино\s+JetTon\b",
+        r"\w*казино\s+TONCOIN\b",
         r"\bSugar\s+Rush\b",
         r"\bбонуску\b",
         r"(?=.*\bвыигрыш\b)(?=.*\bказино\b)(?=.*\bдепозит\b).*",
@@ -58,7 +59,7 @@ def has_critical_patterns(text):
         r"\bинтимны[ех]\s+фото\b",
         r"\bобнаж[её]нны[ех]\s+фото\w*",
         r"\bинтим\s+фото\b",
-
+        r"\bпикантны[ех]\s+фото\b",
 	 ]
     crit_pattern = re.compile("|".join(crit_spam_phrases), re.IGNORECASE | re.DOTALL)
     has_crit = crit_pattern.search(text)

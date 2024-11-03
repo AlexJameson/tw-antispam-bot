@@ -219,6 +219,23 @@ def test_is_spam_message(text):
     )
     return spam_pattern.search(text)
 
+def check_repeated_emojis(text):
+    
+    # Convert emoji to aliases for easier handling
+    emoji_text = emoji.demojize(text)
+    
+    # Pattern to match repeated emoji aliases
+    pattern = r'(:[^:]+:)\1{3,}'
+    
+    matches = re.findall(pattern, emoji_text)
+    
+    if matches:
+        # Convert matches back to emojis for display
+        emoji_matches = [emoji.emojize(m) for m in matches]
+        return '|'.join(emoji_matches)
+    else:
+        return None
+
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
     numeric_chat_id = message.chat.id
@@ -266,6 +283,8 @@ async def check_automatically(update: Update, context: CallbackContext):
     else:
         emoji_critical_num = False
         
+    repeated_emojis = check_repeated_emojis(words)
+        
     user_is_premium = user.is_premium
     is_reply = message.reply_to_message is not None
 
@@ -274,9 +293,9 @@ async def check_automatically(update: Update, context: CallbackContext):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Основная регулярка:</b> {spam_tokens is not None}
-<b>Критические токены (+is_premium):</b> {crit_tokens_bool} | {crit_tokens_string}
+<b>Критические токены (+is_premium):</b> {crit_tokens_string}
 <b>Более 12 эмодзи:</b> {emoji_critical_num}
-<b>Является ответом:</b> {is_reply}
+<b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis}
             """
         if message.text is not None:
             message_text = message.text_html_urled
