@@ -361,7 +361,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                 return
 
     # suggestion mode
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1) and (len(words) < 500) and not "#вакансия" in words:
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis is not None) and (len(words) < 500) and (not "#вакансия" or "#подработка" in words):
 
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
@@ -369,7 +369,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>Является ответом:</b> {is_reply}
+<b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
