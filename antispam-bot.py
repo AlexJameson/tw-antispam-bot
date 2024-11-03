@@ -366,7 +366,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                 return
 
     # suggestion mode
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 500) and (not "#вакансия" or "#подработка" in words):
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 500) and (not "#вакансия" or not "#подработка" in words):
 
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
