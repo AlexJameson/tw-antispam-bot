@@ -98,6 +98,37 @@ async def show_stats(update, context):
     # Replying to the message
     await update.message.reply_text(message)
 
+
+async def check_repeated_emojis(text):
+    
+    # Convert emoji to aliases for easier handling
+    emoji_text = emoji.demojize(text)
+    
+    # Pattern to match repeated emoji aliases
+    pattern = r'(:[^:]+:)\1{3,}'
+    
+    matches = re.findall(pattern, emoji_text)
+    
+    if matches:
+        # Convert matches back to emojis for display
+        emoji_matches = [emoji.emojize(m) for m in matches]
+        return '|'.join(emoji_matches)
+    else:
+        return None
+
+async def check_hashtags(text):
+    
+    # Pattern to match hashtags
+    hashtag_pattern = r'#\w+'
+    
+    # Find all hashtags in the message
+    hashtags = re.findall(hashtag_pattern, text)
+    
+    if hashtags:
+        return '|'.join(hashtags)
+    else:
+        return None
+
 async def report_manually(update: Update, context: CallbackContext):  
     if update.message.reply_to_message:
         reply_to_message = update.message.reply_to_message
@@ -127,24 +158,22 @@ async def report_manually(update: Update, context: CallbackContext):
         num_regular = len(regular_patterns)
         crypto_patterns = re.findall(crypto_pattern, words)
         num_crypto = len(crypto_patterns)
-        adult_patterns = re.findall(adult_pattern, words)
-        num_adult = len(adult_patterns)
-        betting_patterns = re.findall(betting_pattern, words)
-        num_betting = len(betting_patterns)
 		    
         mixed_words = has_mixed_words(words)
         num_mixed = len(mixed_words)        
 
-        repeated_emojis = check_repeated_emojis(words)
+        repeated_emojis = await check_repeated_emojis(words)
         repeated_emojis_bool = repeated_emojis is not None
+        
+        has_hashtags = await check_hashtags(words)
+        has_hashtags_bool = has_hashtags is not None
     
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
-<b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
-<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis_bool}
+<b>Хештеги:</b> {has_hashtags_bool}
         """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
@@ -223,23 +252,6 @@ def test_is_spam_message(text):
     )
     return spam_pattern.search(text)
 
-def check_repeated_emojis(text):
-    
-    # Convert emoji to aliases for easier handling
-    emoji_text = emoji.demojize(text)
-    
-    # Pattern to match repeated emoji aliases
-    pattern = r'(:[^:]+:)\1{3,}'
-    
-    matches = re.findall(pattern, emoji_text)
-    
-    if matches:
-        # Convert matches back to emojis for display
-        emoji_matches = [emoji.emojize(m) for m in matches]
-        return '|'.join(emoji_matches)
-    else:
-        return None
-
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
     numeric_chat_id = message.chat.id
@@ -287,11 +299,14 @@ async def check_automatically(update: Update, context: CallbackContext):
     else:
         emoji_critical_num = False
         
-    repeated_emojis = check_repeated_emojis(words)
+    repeated_emojis = await check_repeated_emojis(words)
     repeated_emojis_bool = repeated_emojis is not None
         
     user_is_premium = user.is_premium
     is_reply = message.reply_to_message is not None
+    
+    has_hashtags = await check_hashtags(words)
+    has_hashtags_bool = has_hashtags is not None
 
     # Ban automatically
     if (len(words) < 500 and is_reply is False and (not "#вакансия" in words or not "#подработка" in words)) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or (crit_tokens_bool is True and user_is_premium is True) or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
@@ -375,6 +390,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis}
+<b>Хештеги:</b> {has_hashtags_bool}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
