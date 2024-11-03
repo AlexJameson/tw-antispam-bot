@@ -123,11 +123,9 @@ def check_hashtags(text):
     
     # Find all hashtags in the message
     hashtags = re.findall(hashtag_pattern, text)
-    fin_pattern = re.compile(hashtag_pattern, re.IGNORECASE)
-    matches = fin_pattern.search(text)
     
     if hashtags:
-        return matches
+        return ', '.join(hashtags)
     else:
         return None
 
@@ -166,14 +164,13 @@ async def report_manually(update: Update, context: CallbackContext):
         repeated_emojis_bool = repeated_emojis is not None
         
         has_hashtags = check_hashtags(words)
-        has_hashtags_bool = has_hashtags is not None
     
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis_bool}
-<b>Хештеги:</b> {has_hashtags_bool}
+<b>Хештеги:</b> {has_hashtags}
         """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
@@ -371,7 +368,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                 return
 
     # suggestion mode
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 500) and has_hashtags_bool is False:
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 500 and has_hashtags_bool is False):
 
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
@@ -380,7 +377,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis}
-<b>Хештеги:</b> {has_hashtags_bool}
+<b>Хештеги:</b> {has_hashtags}
         """
         callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)

@@ -49,7 +49,6 @@ def has_critical_patterns(text):
         r"(?=.*\bвыигрыш\b)(?=.*\bказино\b)(?=.*\bTONCOIN\b).*",
         
 		  # Adult
-        r"\bПроверь любую девушку\b",
         r"\bфото[,\.]?\s+видео\s+девушек\b",
         r"\bпереписки\s+и\s+сохраненные\s+фото\b",
         r"\bмоментальная\s+проверка\s+соц\.\s+сети\s+девушки\b",
@@ -60,6 +59,7 @@ def has_critical_patterns(text):
         r"\bобнаж[её]нны[ех]\s+фото\w*",
         r"\bинтим\s+фото\b",
         r"\bпикантны[ех]\s+фото\b",
+        r"проверь.*(?:подругу|девушку|жену)",
 	 ]
     crit_pattern = re.compile("|".join(crit_spam_phrases), re.IGNORECASE | re.DOTALL)
     has_crit = crit_pattern.search(text)
