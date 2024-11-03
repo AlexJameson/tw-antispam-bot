@@ -116,7 +116,7 @@ async def check_repeated_emojis(text):
     else:
         return None
 
-async def check_hashtags(text):
+def check_hashtags(text):
     
     # Pattern to match hashtags
     hashtag_pattern = r'#\w+'
@@ -165,7 +165,7 @@ async def report_manually(update: Update, context: CallbackContext):
         repeated_emojis = await check_repeated_emojis(words)
         repeated_emojis_bool = repeated_emojis is not None
         
-        has_hashtags = await check_hashtags(words)
+        has_hashtags = check_hashtags(words)
         has_hashtags_bool = has_hashtags is not None
     
         verdict = f"""
@@ -295,7 +295,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     user_is_premium = user.is_premium
     is_reply = message.reply_to_message is not None
     
-    has_hashtags = await check_hashtags(words)
+    has_hashtags = check_hashtags(words)
     has_hashtags_bool = has_hashtags is not None
 
     # Ban automatically
