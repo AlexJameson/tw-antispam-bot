@@ -133,7 +133,10 @@ async def report_manually(update: Update, context: CallbackContext):
         num_betting = len(betting_patterns)
 		    
         mixed_words = has_mixed_words(words)
-        num_mixed = len(mixed_words)
+        num_mixed = len(mixed_words)        
+
+        repeated_emojis = check_repeated_emojis(words)
+        repeated_emojis_bool = repeated_emojis is not None
     
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
@@ -141,6 +144,7 @@ async def report_manually(update: Update, context: CallbackContext):
 <b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
+<b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis_bool}
         """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
