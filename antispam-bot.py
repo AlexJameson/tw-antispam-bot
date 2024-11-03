@@ -123,9 +123,11 @@ async def check_hashtags(text):
     
     # Find all hashtags in the message
     hashtags = re.findall(hashtag_pattern, text)
+    fin_pattern = re.compile(hashtag_pattern, re.IGNORECASE)
+    matches = fin_pattern.search(text)
     
     if hashtags:
-        return '|'.join(hashtags)
+        return matches
     else:
         return None
 
@@ -152,8 +154,6 @@ async def report_manually(update: Update, context: CallbackContext):
 
         reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
         crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
-        adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
-        betting_pattern = '|'.join(map(re.escape, BETTING_TOKENS))
         regular_patterns = re.findall(reg_pattern, words)
         num_regular = len(regular_patterns)
         crypto_patterns = re.findall(crypto_pattern, words)
@@ -241,16 +241,6 @@ async def button_delete(update: Update, context: CallbackContext):
         error_message = f"Возникла ошибка: {str(e)}"
         await query.message.reply_html(error_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
-
-def test_is_spam_message(text):
-    spam_pattern = re.compile(
-        r"(набираю\s+команду|набираем\s+команду|набираем\s+людей|набор|ищу\s+людей|нужны\s+люди|ищем\s+людей|ищу\s+партнеров|ищу\s+партнёров|идет\s+набор|идёт\s+набор\s+людей|в\s+поиске\s+людей|амбициозного|амбициозных|удалённый\s+заработок|ответственные\s+люди|срочно\s+требуются|заработка|20\s+минут|хороший\s+доход|пассивный\s+заработок|необходимость\s+в\s+новых\s+партнерах|первые\s+хорошие\s+деньги|бинанс|байбит|Okx|mexc|JetTon|приумножить\s+свои\s+средства|не\s+выходя\s+из\s+дому|не\s+выходя\s+из\s+дома|занятость\s+с\s+хорошим\s+доходом|с\s+хорошей\s+прибылью|приятная\s+прибыль|удаленная\s+сфера|удаленное\s+сотрудничество|для\s+удаленной\s+работы|по\s+пассивному\s+заработку|доп\s+доход|аирдропы|тестнеты|лаунчпады|в\s+дополнительном\s+заработке|направление\s+для\s+сотрудничества|удаленную\s+занятость|на\s+удаленной\s+основе|опыт\s+не\s+важен|в\s+сфере\s+криптовалют|нужен\s+только\s+телефон|возможность\s+зарабатывать\s+онлайн|можно\s+с\s+телефона|хороший\s+заработок|часов\s+в\s+день|опыт\s+не\s+требуется).*?(" 
-        r"пассивный\s+заработок|в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|в\s+лс|л\.с|л\.\s+с|в\s+лс\s+за\s+деталями|за\s+деталями\s+в\s+лс|за\s+деталями\s+пиши|1-2\s+часа\s+в\s+день|вывод\s+средств|с\s+телефона|пассивный\s+заработок|в\s+команду|для\s+сотрудничества|для\s+заработка|личные\s+сообщения|личные\s+смс|в\s+личные|пишите\s+в\s+личные|пишите\s+в\s+личку|для\s+подробностей\s+пиши|в\s+лс|л\.с|л\.\s+с|в\s+лс\s+за\s+деталями|за\s+деталями\s+в\s+лс|за\s+деталями\s+пиши|1-2\s+часа\s+в\s+день|вывод\s+средств|пишите\s+мне|в\s+личных\s+сообщениях|"
-        r"доход|доходы|дохода|заработок|заработка|ежедневный\s+доход|прибыль|прибыли|занятость"
-        r"|[\+\-]?\s*(\d+\s*)(долларов|день|USD|$|20+|18+|от\s+18|от\s+20|от\s+25|ОТ\s+18|с\s+18)?)",
-        re.IGNORECASE | re.DOTALL
-    )
-    return spam_pattern.search(text)
 
 async def check_automatically(update: Update, context: CallbackContext):
     message = update.message
@@ -381,7 +371,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                 return
 
     # suggestion mode
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 500) and (not "#вакансия" or not "#подработка" in words):
+    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 500) and has_hashtags_bool is False:
 
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
