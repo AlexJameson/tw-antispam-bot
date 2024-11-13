@@ -41,12 +41,14 @@ def has_critical_patterns(text):
         r"slotston_bot",
         r"\bтелеграм\s+бот\s+казино\b",
         r"казино\s*бот",
+        r"криптоказино",
         r"\w*казино\s+JetTon\b",
         r"\w*казино\s+TONCOIN\b",
         r"\bSugar\s+Rush\b",
         r"\bбонуску\b",
         r"(?=.*\bвыигрыш\b)(?=.*\bказино\b)(?=.*\bдепозит\b).*",
         r"(?=.*\bвыигрыш\b)(?=.*\bказино\b)(?=.*\bTONCOIN\b).*",
+        r"\bигра[юл]\s+тут\b",
         
 		  # Adult
         r"\bфото[,\.]?\s+видео\s+девушек\b",

@@ -265,8 +265,6 @@ async def check_automatically(update: Update, context: CallbackContext):
     num_regular = len(regular_patterns)
     crypto_patterns = re.findall(crypto_pattern, words)
     num_crypto = len(crypto_patterns)
-    adult_patterns = re.findall(adult_pattern, words)
-    num_adult = len(adult_patterns)
     betting_patterns = re.findall(betting_pattern, words)
     num_betting = len(betting_patterns)
     
@@ -296,7 +294,7 @@ async def check_automatically(update: Update, context: CallbackContext):
     has_hashtags_bool = has_hashtags is not None
 
     # Ban automatically
-    if (len(words) < 525 and is_reply is False and has_hashtags_bool is False) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or (crit_tokens_bool is True and user_is_premium is True) or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
+    if (len(words) < 530 and is_reply is False and has_hashtags_bool is False) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or (crit_tokens_bool is True and user_is_premium is True) or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Основная регулярка:</b> {spam_tokens is not None}
@@ -368,12 +366,11 @@ async def check_automatically(update: Update, context: CallbackContext):
                 return
 
     # suggestion mode
-    if (num_regular > 1 or num_crypto > 0 or num_adult > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 525 and has_hashtags_bool is False):
+    if (num_regular > 1 or num_crypto > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 530 and has_hashtags_bool is False):
 
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
 <b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
-<b>18+:</b> {num_adult}; [ {', '.join(adult_patterns)} ]
 <b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis}
