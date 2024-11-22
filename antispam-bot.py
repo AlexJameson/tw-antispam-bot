@@ -284,6 +284,8 @@ async def check_automatically(update: Update, context: CallbackContext):
         
     repeated_emojis = await check_repeated_emojis(words)
     repeated_emojis_bool = repeated_emojis is not None
+
+    is_reply = message.reply_to_message is not None
     
     has_hashtags = check_hashtags(words)
     has_hashtags_bool = has_hashtags is not None
