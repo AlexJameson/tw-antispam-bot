@@ -250,7 +250,6 @@ async def check_automatically(update: Update, context: CallbackContext):
     elif user.last_name is None:
         user_display_name = f"{user.first_name}"
     user_link = f"https://t.me/{user.username}"
-    link = f"https://t.me/c/{chat_id}/{message_id}"
 
     if message.text is None and message.caption is None:
         return
@@ -259,7 +258,6 @@ async def check_automatically(update: Update, context: CallbackContext):
         
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
     crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
-    adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
     betting_pattern = '|'.join(map(re.escape, BETTING_TOKENS))
     regular_patterns = re.findall(reg_pattern, words)
     num_regular = len(regular_patterns)
@@ -338,13 +336,13 @@ async def check_automatically(update: Update, context: CallbackContext):
             caption_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
             
             try:
-                await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
                 await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
                                 caption=caption_content,
                                 parse_mode="HTML")
                 await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
+                await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
                 
                 current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 db_stat.insert({
