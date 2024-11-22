@@ -284,19 +284,16 @@ async def check_automatically(update: Update, context: CallbackContext):
         
     repeated_emojis = await check_repeated_emojis(words)
     repeated_emojis_bool = repeated_emojis is not None
-        
-    user_is_premium = user.is_premium
-    is_reply = message.reply_to_message is not None
     
     has_hashtags = check_hashtags(words)
     has_hashtags_bool = has_hashtags is not None
 
     # Ban automatically
-    if (len(words) < 530 and is_reply is False and has_hashtags_bool is False) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or (crit_tokens_bool is True and user_is_premium is True) or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
+    if (len(words) < 530 and is_reply is False and has_hashtags_bool is False) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or crit_tokens_bool is True or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
         verdict = f"""
 <b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
 <b>Основная регулярка:</b> {spam_tokens is not None}
-<b>Критические токены (+is_premium):</b> {crit_tokens_string}
+<b>Критические токены:</b> {crit_tokens_string}
 <b>Более 12 эмодзи:</b> {emoji_critical_num}
 <b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis_bool}
             """
