@@ -49,6 +49,8 @@ def has_critical_patterns(text):
         r"\bтелеграм\s+бот\s+казино\b",
         r"казино\s+бот",
         r"казинобот",
+        r"казино-бот\w*",
+        r"фриспин\w*",
         r"криптоказино",
         r"\w*казино\s+JetTon\b",
         r"\w*казино\s+TONCOIN\b",
@@ -59,7 +61,7 @@ def has_critical_patterns(text):
         r"(?=.*\bказино\b)(?=.*\bTONCOIN\b).*",
         r"(?=.*\bпополнил\w*)(?=.*\bслот\w*).*",
         r"\bигра[юл]\s+тут\b",
-        r"\bказик\b",
+        r"\bказик\w*",
         r"\bCRYPTO\s+CASINO\b",
         r"\bSweet\s+Bonanza\b",
         
