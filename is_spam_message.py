@@ -44,9 +44,9 @@ def has_critical_patterns(text):
         r"\bкурсы\s+по\s+крипте\b",
         
 		  # Gambling
-        r"jeton_games",
-        r"slotston_bot",
-        r"\bтелеграм\s+бот\s+казино\b",
+        r"ton_games",
+        r"ton_bot",
+        r"телеграм\s+бот\s+казино",
         r"казино\s+бот",
         r"казинобот",
         r"казино-бот\w*",
