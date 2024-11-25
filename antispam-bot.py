@@ -415,6 +415,10 @@ async def delete_stories_and_video_notes(update: Update, context: CallbackContex
     message = update.message
     if message.story is not None or message.video_note is not None:
         try:
+            info_message = "Удалена история или видеосообщение:"
+            await context.bot.send_message(chat_id=TARGET_CHAT,
+                                text=info_message,
+                                parse_mode="HTML")
             await context.bot.forward_message(chat_id=TARGET_CHAT, from_chat_id=message.chat_id, message_id=message.message_id)
             await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -425,11 +429,10 @@ async def delete_stories_and_video_notes(update: Update, context: CallbackContex
             })
             return
         except TelegramError as e:
-                error_message = f"Возникла ошибка при удалении истории или кружочка: {str(e)}"
-                await context.bot.copy_message(chat_id=TARGET_CHAT,
-                                from_chat_id=message.chat_id,
+                error_message = f"Возникла ошибка при удалении истории или видеосообщения: {str(e)}"
+                await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=error_message,
-                                message_id=message.message_id,
+                                disable_web_page_preview=True,
                                 parse_mode="HTML")
                 await context.bot.forward_message(chat_id=TARGET_CHAT, from_chat_id=message.chat_id, message_id=message.message_id)
                 return
