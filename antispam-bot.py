@@ -411,9 +411,9 @@ async def auto_ignore_button(update: Update, context: CallbackContext):
         await query.message.reply_html(error_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
 
-async def delete_stories(update: Update, context: CallbackContext):
+async def delete_stories_and_video_notes(update: Update, context: CallbackContext):
     message = update.message
-    if message.story:
+    if message.story or message.video_note:
         try:
             await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
             print(f"Deleted a story from {message.from_user.id}")
@@ -429,7 +429,7 @@ def main():
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND & ~filters.STORY, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
     application.add_handler(CommandHandler("stats", show_stats))
-    application.add_handler(MessageHandler(filters.STORY, delete_stories))
+    application.add_handler(MessageHandler(filters.STORY & filters.VIDEO_NOTE, delete_stories_and_video_notes))
 
     application.run_polling(allowed_updates=True)
 
