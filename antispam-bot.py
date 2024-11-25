@@ -413,15 +413,26 @@ async def auto_ignore_button(update: Update, context: CallbackContext):
 
 async def delete_stories_and_video_notes(update: Update, context: CallbackContext):
     message = update.message
-    print(message)
-    print(message.video_note)
     if message.story is not None or message.video_note is not None:
         try:
+            await context.bot.forward_message(chat_id=TARGET_CHAT, from_chat_id=message.chat_id, message_id=message.message_id)
             await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
-            print("gotcha")
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            db_stat.insert({
+               'type': 'ban',
+               'method': 'auto',
+               'timestamp': current_time
+            })
+            return
         except TelegramError as e:
-            print(f"Возникла ошибка при удалении: {str(e)}")
-
+                error_message = f"Возникла ошибка при удалении истории или кружочка: {str(e)}"
+                await context.bot.copy_message(chat_id=TARGET_CHAT,
+                                from_chat_id=message.chat_id,
+                                text=error_message,
+                                message_id=message.message_id,
+                                parse_mode="HTML")
+                await context.bot.forward_message(chat_id=TARGET_CHAT, from_chat_id=message.chat_id, message_id=message.message_id)
+                return
 def main():
     print("I'm working")
 
