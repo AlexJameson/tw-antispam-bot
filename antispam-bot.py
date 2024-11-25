@@ -415,7 +415,7 @@ async def delete_stories_and_video_notes(update: Update, context: CallbackContex
     message = update.message
     if message.story is not None or message.video_note is not None:
         try:
-            info_message = "Удалена история или видеосообщение:"
+            info_message = f"[◉¯] <b>Удалена история или видеосообщение</b>:"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=info_message,
                                 parse_mode="HTML")
