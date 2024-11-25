@@ -251,7 +251,7 @@ async def check_automatically(update: Update, context: CallbackContext):
         user_display_name = f"{user.first_name}"
     user_link = f"https://t.me/{user.username}"
 
-    if message.text is None and message.caption is None:
+    if message.text is None and message.caption is None or (message.story is not None or message.video_note is not None):
         return
 
     words = message.text or message.caption
