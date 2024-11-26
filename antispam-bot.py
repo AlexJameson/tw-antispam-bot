@@ -259,13 +259,16 @@ async def check_automatically(update: Update, context: CallbackContext):
     reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
     crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
     betting_pattern = '|'.join(map(re.escape, BETTING_TOKENS))
+    adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
     regular_patterns = re.findall(reg_pattern, words)
     num_regular = len(regular_patterns)
     crypto_patterns = re.findall(crypto_pattern, words)
     num_crypto = len(crypto_patterns)
     betting_patterns = re.findall(betting_pattern, words)
     num_betting = len(betting_patterns)
-    
+    adult_patterns = re.findall(adult_pattern, words)
+    num_adult = len(adult_patterns)
+
     mixed_words = has_mixed_words(words)
     num_mixed = len(mixed_words)
     
@@ -363,7 +366,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                 return
 
     # suggestion mode
-    if (num_regular > 1 or num_crypto > 0 or num_betting > 0 or num_mixed > 1 or repeated_emojis_bool is True) and (len(words) < 530 and has_hashtags_bool is False):
+    if (num_regular > 1 or num_crypto > 0 or num_betting > 0 or num_mixed > 1 or num_adult > 1) and (len(words) < 530 and has_hashtags_bool is False):
 
         verdict = f"""
 <b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
@@ -415,7 +418,7 @@ async def delete_stories_and_video_notes(update: Update, context: CallbackContex
     message = update.message
     if message.story is not None or message.video_note is not None:
         try:
-            info_message = f"[◉¯] <b>Удалена история или видеосообщение</b>:"
+            info_message = "[◉¯] <b>Удалена история или видеосообщение</b>:"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=info_message,
                                 parse_mode="HTML")
