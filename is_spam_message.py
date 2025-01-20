@@ -223,7 +223,6 @@ def new_is_spam_message(text):
         r"срочно\s+треб[уею]тся",
 
         # Adult content patterns
-        r"\bслитые\s+фото\b",
         r"\bсливы\b",
         r"\bслив\b",
         

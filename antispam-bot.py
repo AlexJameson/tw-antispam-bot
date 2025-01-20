@@ -445,7 +445,7 @@ def main():
     application = ApplicationBuilder().token(TOKEN).arbitrary_callback_data(True).build()
     application.add_handler(CallbackQueryHandler(auto_ignore_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
-    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND & ~filters.STORY & ~filters.VIDEO_NOTE, check_automatically))
+    #application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND & ~filters.STORY & ~filters.VIDEO_NOTE, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
     application.add_handler(CommandHandler("stats", show_stats))
     application.add_handler(MessageHandler(filters.ALL, delete_stories_and_video_notes))
