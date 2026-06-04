@@ -24,8 +24,9 @@ load_dotenv()
 
 TOKEN = os.getenv('ANTISPAM_TOKEN')
 TARGET_CHAT = os.getenv('TARGET_GROUP_ID')
-PRIMARY_ADMIN = os.getenv('PRIMARY_ADMIN')
-BACKUP_ADMIN = os.getenv('BACKUP_ADMIN')
+PRIMARY_ADMIN = os.getenv('PRIMARY_ADMIN') or ''
+BACKUP_ADMIN = os.getenv('BACKUP_ADMIN') or ''
+ADMIN_MENTIONS = f'@{PRIMARY_ADMIN} @{BACKUP_ADMIN}' if PRIMARY_ADMIN and BACKUP_ADMIN else ''
 
 class DeleteCallbackData:
     def __init__(self, chat_id, message_id, user_id, update_message_id):
@@ -174,7 +175,7 @@ async def report_manually(update: Update, context: CallbackContext):
         """
         if reply_to_message.text is not None:
             message_text = reply_to_message.text_html_urled
-            text_message_content = f"🥊 <b>Ручной бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            text_message_content = f"🥊 <b>Ручной бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n{ADMIN_MENTIONS}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                     text=text_message_content,
                                     disable_web_page_preview=True,
@@ -182,7 +183,7 @@ async def report_manually(update: Update, context: CallbackContext):
                                     reply_markup=keyboard)
         elif reply_to_message.text is None:
             message_text = reply_to_message.caption_html_urled
-            new_caption = f"🥊 <b>Ручной бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n@{PRIMARY_ADMIN} @{BACKUP_ADMIN}"
+            new_caption = f"🥊 <b>Ручной бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n{ADMIN_MENTIONS}"
             await context.bot.copy_message(chat_id=TARGET_CHAT,
                                     from_chat_id=reply_to_message.chat_id,
                                     message_id=reply_to_message.message_id,
