@@ -2,15 +2,11 @@
 import datetime
 import logging
 import os
-import re
 import json
-import emoji
-from is_spam_message import new_is_spam_message, has_critical_patterns, has_mixed_words
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity, User
 from telegram.error import TelegramError
-from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from spam_tokens import REGULAR_TOKENS, FINCRYPTO_TOKENS, ADULT_TOKENS, BETTING_TOKENS
+from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler
 from tinydb import TinyDB, Query
 
 logging.basicConfig(level=logging.WARNING, 
@@ -93,58 +89,17 @@ async def show_stats(update, context):
         # Get all ban records
         bans = db_stat.search(Stats.type == 'ban')
     
-    # Aggregate results by 'method'
-    ban_count = {}
-    for ban in bans:
-        method = ban['method']
-        if method in ban_count:
-            ban_count[method] += 1
-        else:
-            ban_count[method] = 1
-            
     total_bans = len(bans)
-    auto_bans = ban_count.get('auto', 0)
 
     # Constructing the message
     if total_bans > 0:
-        auto_ban_rate = (auto_bans / total_bans) * 100
-        message = f"Statistics for '{period}':\n\nTotal bans: {total_bans}\nAutomatically banned: {auto_bans}\nAuto ban rate: {int(auto_ban_rate)}%"
+        message = f"Statistics for '{period}':\n\nTotal bans: {total_bans}"
     else:
         message = f"No bans recorded for the period '{period}'."
     
     # Replying to the message
     await update.message.reply_text(message)
 
-
-async def check_repeated_emojis(text):
-    
-    # Convert emoji to aliases for easier handling
-    emoji_text = emoji.demojize(text)
-    
-    # Pattern to match repeated emoji aliases
-    pattern = r'(:[^:]+:)\1{3,}'
-    
-    matches = re.findall(pattern, emoji_text)
-    
-    if matches:
-        # Convert matches back to emojis for display
-        emoji_matches = [emoji.emojize(m) for m in matches]
-        return '|'.join(emoji_matches)
-    else:
-        return None
-
-def check_hashtags(text):
-    
-    # Pattern to match hashtags
-    hashtag_pattern = r'#\w+'
-    
-    # Find all hashtags in the message
-    hashtags = re.findall(hashtag_pattern, text)
-    
-    if hashtags:
-        return ', '.join(hashtags)
-    else:
-        return None
 
 async def report_manually(update: Update, context: CallbackContext):
     if not update.message.reply_to_message:
@@ -221,9 +176,28 @@ async def button_delete(update: Update, context: CallbackContext):
         moderator = query.from_user
         moderator_display_name = user_display_name(moderator)
         moderator_link = user_link(moderator)
-        banned_user_link = f"tg://user?id={user_id}"
-        ban_report_message = f"<a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил <a href='{banned_user_link}'><b>{user_name}</b></a> (ID: {user_id})"
-        await query.message.reply_html(ban_report_message, disable_web_page_preview=True)
+
+        prefix = f"{moderator_display_name} забанил "
+        banned_part = f"{user_name} "
+        suffix = f"(ID: {user_id})"
+        ban_report_message = prefix + banned_part + suffix
+
+        entities = []
+        if moderator_link:
+            entities.append(MessageEntity(
+                type=MessageEntity.TEXT_LINK,
+                offset=0,
+                length=len(moderator_display_name),
+                url=moderator_link
+            ))
+        entities.append(MessageEntity(
+            type=MessageEntity.TEXT_MENTION,
+            offset=len(prefix),
+            length=len(banned_part.rstrip()),
+            user=User(id=user_id, first_name=user_name, is_bot=False)
+        ))
+
+        await query.message.reply_text(ban_report_message, entities=entities)
         await query.edit_message_reply_markup(None)
             
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -239,213 +213,13 @@ async def button_delete(update: Update, context: CallbackContext):
         await query.message.reply_html(error_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
 
-async def check_automatically(update: Update, context: CallbackContext):
-    message = update.message
-    numeric_chat_id = message.chat.id
-    chat_id = str(numeric_chat_id).replace("-100", "")
-    message_id = message.message_id
-    user = message.from_user
-    display_name = user_display_name(user)
-    profile_link = user_link(user)
-
-    if message.text is None and message.caption is None or (message.story is not None or message.video_note is not None):
-        return
-
-    words = message.text or message.caption
-        
-    reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
-    crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
-    betting_pattern = '|'.join(map(re.escape, BETTING_TOKENS))
-    adult_pattern = '|'.join(map(re.escape, ADULT_TOKENS))
-    regular_patterns = re.findall(reg_pattern, words)
-    num_regular = len(regular_patterns)
-    crypto_patterns = re.findall(crypto_pattern, words)
-    num_crypto = len(crypto_patterns)
-    betting_patterns = re.findall(betting_pattern, words)
-    num_betting = len(betting_patterns)
-    adult_patterns = re.findall(adult_pattern, words)
-    num_adult = len(adult_patterns)
-
-    mixed_words = has_mixed_words(words)
-    num_mixed = len(mixed_words)
-    
-    spam_tokens = new_is_spam_message(words)
-    crit_tokens = has_critical_patterns(words)
-    crit_tokens_bool = crit_tokens is not None
-    if crit_tokens:
-        crit_tokens_string = crit_tokens.group()
-    else: crit_tokens_string = None
-    
-    emoji_num = sum(1 for _ in emoji.emoji_list(words))
-    if emoji_num > 12:
-        emoji_critical_num = True
-    else:
-        emoji_critical_num = False
-        
-    repeated_emojis = await check_repeated_emojis(words)
-    repeated_emojis_bool = repeated_emojis is not None
-
-    is_reply = message.reply_to_message is not None
-    
-    has_hashtags = check_hashtags(words)
-    has_hashtags_bool = has_hashtags is not None
-
-    # Ban automatically
-    if (len(words) < 530 and is_reply is False and has_hashtags_bool is False) and (("✅✅✅✅" in words or "✅✅✅✅" in words.replace('\U0001F537', '✅') or crit_tokens_bool is True or num_mixed > 1 or spam_tokens is not None or emoji_critical_num is True)):
-        verdict = f"""
-<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>Основная регулярка:</b> {spam_tokens is not None}
-<b>Критические токены:</b> {crit_tokens_string}
-<b>Более 12 эмодзи:</b> {emoji_critical_num}
-<b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis_bool}
-            """
-        if message.text is not None:
-            message_text = message.text_html_urled
-            text_message_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
-
-            try:
-                await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
-                await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-                await context.bot.send_message(chat_id=TARGET_CHAT,
-                                text=text_message_content,
-                                disable_web_page_preview=True,
-                                parse_mode="HTML")
-                
-                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                db_stat.insert({
-                    'type': 'ban',
-                    'method': 'auto',
-                    'timestamp': current_time
-                })
-
-                return
-
-            except TelegramError as e:
-                # Handle error, send a custom message if an error occurs
-                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
-                await context.bot.send_message(chat_id=TARGET_CHAT,
-                                text=error_message,
-                                disable_web_page_preview=True,
-                                parse_mode="HTML")
-                
-                return
-
-        elif message.text is None:
-            message_text = message.caption_html_urled
-            caption_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
-            
-            try:
-                await context.bot.copy_message(chat_id=TARGET_CHAT,
-                                from_chat_id=message.chat_id,
-                                message_id=message.message_id,
-                                caption=caption_content,
-                                parse_mode="HTML")
-                await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
-                await context.bot.ban_chat_member(chat_id=message.chat_id, user_id=message.from_user.id)
-                
-                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                db_stat.insert({
-                    'type': 'ban',
-                    'method': 'auto',
-                    'timestamp': current_time
-                })
-
-                return
-
-            except TelegramError as e:
-                # Handle error, send a custom message if an error occurs
-                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
-                await context.bot.copy_message(chat_id=TARGET_CHAT,
-                                from_chat_id=message.chat_id,
-                                message_id=message.message_id,
-                                caption=error_message,
-                                parse_mode="HTML")
-                return
-
-    # suggestion mode
-    if (num_regular > 1 or num_crypto > 0 or num_betting > 0 or num_mixed > 0 or num_adult > 0) and (len(words) < 530 and has_hashtags_bool is False):
-
-        verdict = f"""
-<b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
-<b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
-<b>Гемблинг:</b> {num_betting}; [ {', '.join(betting_patterns)} ]
-<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis}
-<b>Хештеги:</b> {has_hashtags}
-        """
-        callback_data = DeleteCallbackData(chat_id, message_id, user.id, display_name, update.message.message_id)
-        callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
-        keyboard = [
-            [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized),
-             InlineKeyboardButton("Пропустить", callback_data='Declined')]
-            ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        if message.text is not None:
-            message_text = message.text_html_urled
-            text_message_content = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
-            await context.bot.send_message(chat_id=TARGET_CHAT,
-                                text=text_message_content,
-                                disable_web_page_preview=True,
-                                parse_mode="HTML",
-                                reply_markup=reply_markup)
-        elif message.text is None:
-            message_text = message.caption_html_urled
-            new_caption = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
-            await context.bot.copy_message(chat_id=TARGET_CHAT,
-                                from_chat_id=message.chat_id,
-                                message_id=message.message_id,
-                                caption=new_caption,
-                                parse_mode="HTML",
-                                reply_markup=reply_markup)
-
-async def auto_ignore_button(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    
-    try:
-        await query.edit_message_reply_markup(None)
-
-    except TelegramError as e:
-        error_message = f"Возникла ошибка: {str(e)}"
-        await query.message.reply_html(error_message, disable_web_page_preview=True)
-        await query.edit_message_reply_markup(None)
-
-async def delete_stories_and_video_notes(update: Update, context: CallbackContext):
-    message = update.message
-    if message.story is not None or message.video_note is not None:
-        try:
-            info_message = "[◉¯] <b>Удалена история или видеосообщение</b>:"
-            await context.bot.send_message(chat_id=TARGET_CHAT,
-                                text=info_message,
-                                parse_mode="HTML")
-            await context.bot.forward_message(chat_id=TARGET_CHAT, from_chat_id=message.chat_id, message_id=message.message_id)
-            await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            db_stat.insert({
-               'type': 'delete',
-               'method': 'auto',
-               'timestamp': current_time
-            })
-            return
-        except TelegramError as e:
-                error_message = f"Возникла ошибка при удалении истории или видеосообщения: {str(e)}"
-                await context.bot.send_message(chat_id=TARGET_CHAT,
-                                text=error_message,
-                                disable_web_page_preview=True,
-                                parse_mode="HTML")
-                await context.bot.forward_message(chat_id=TARGET_CHAT, from_chat_id=message.chat_id, message_id=message.message_id)
-                return
 def main():
     print("I'm working")
 
     application = ApplicationBuilder().token(TOKEN).arbitrary_callback_data(True).build()
-    application.add_handler(CallbackQueryHandler(auto_ignore_button, pattern="Declined"))
     application.add_handler(CallbackQueryHandler(button_delete))
-    #application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND & ~filters.STORY & ~filters.VIDEO_NOTE, check_automatically))
     application.add_handler(CommandHandler("ban", report_manually))
     application.add_handler(CommandHandler("stats", show_stats))
-    application.add_handler(MessageHandler(filters.ALL, delete_stories_and_video_notes))
 
     application.run_polling(allowed_updates=True)
 
