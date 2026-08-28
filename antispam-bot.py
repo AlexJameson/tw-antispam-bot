@@ -4,7 +4,7 @@ import logging
 import os
 import json
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity, User
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity
 from telegram.error import TelegramError
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler
 from tinydb import TinyDB, Query
@@ -175,27 +175,19 @@ async def button_delete(update: Update, context: CallbackContext):
 
         moderator = query.from_user
         moderator_display_name = user_display_name(moderator)
-        moderator_link = user_link(moderator)
 
         prefix = f"{moderator_display_name} забанил "
         banned_part = f"{user_name} "
         suffix = f"(ID: {user_id})"
         ban_report_message = prefix + banned_part + suffix
 
-        entities = []
-        if moderator_link:
-            entities.append(MessageEntity(
-                type=MessageEntity.TEXT_LINK,
-                offset=0,
-                length=len(moderator_display_name),
-                url=moderator_link
-            ))
-        entities.append(MessageEntity(
-            type=MessageEntity.TEXT_MENTION,
+        banned_user_link = f"tg://user?id={user_id}"
+        entities = [MessageEntity(
+            type=MessageEntity.TEXT_LINK,
             offset=len(prefix),
             length=len(banned_part.rstrip()),
-            user=User(id=user_id, first_name=user_name, is_bot=False)
-        ))
+            url=banned_user_link
+        )]
 
         await query.message.reply_text(ban_report_message, entities=entities)
         await query.edit_message_reply_markup(None)
