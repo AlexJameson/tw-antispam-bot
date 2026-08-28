@@ -44,10 +44,11 @@ def user_link(user):
     return f"tg://user?id={user.id}"
 
 class DeleteCallbackData:
-    def __init__(self, chat_id, message_id, user_id, update_message_id):
+    def __init__(self, chat_id, message_id, user_id, user_name, update_message_id):
         self.ci = chat_id
         self.mi = message_id
         self.ui = user_id
+        self.un = user_name
         self.umi = update_message_id
 
 class ManualEncoder(json.JSONEncoder):
@@ -159,7 +160,7 @@ async def report_manually(update: Update, context: CallbackContext):
     profile_link = user_link(user)
     chat_link = f"https://t.me/c/{chat_id}/{message_id}"
 
-    callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
+    callback_data = DeleteCallbackData(chat_id, message_id, user.id, name, update.message.message_id)
     callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized)]
@@ -199,6 +200,7 @@ async def button_delete(update: Update, context: CallbackContext):
     chat_id_temp = callback_data.get('ci', 'DefaultCI')
     message_id = callback_data.get('mi', 0)
     user_id = callback_data.get('ui', 0)
+    user_name = callback_data.get('un', 'Unknown')
     command_id = callback_data.get('umi', 0)
     chat_id=f"-100{chat_id_temp}"
     
@@ -219,7 +221,8 @@ async def button_delete(update: Update, context: CallbackContext):
         moderator = query.from_user
         moderator_display_name = user_display_name(moderator)
         moderator_link = user_link(moderator)
-        ban_report_message = f"<a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил пользователя с ID {user_id}"
+        banned_user_link = f"tg://user?id={user_id}"
+        ban_report_message = f"<a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил <a href='{banned_user_link}'><b>{user_name}</b></a> (ID: {user_id})"
         await query.message.reply_html(ban_report_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
             
@@ -370,7 +373,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 <b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis}
 <b>Хештеги:</b> {has_hashtags}
         """
-        callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
+        callback_data = DeleteCallbackData(chat_id, message_id, user.id, display_name, update.message.message_id)
         callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
         keyboard = [
             [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized),
