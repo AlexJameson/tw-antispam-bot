@@ -4,8 +4,9 @@ import logging
 import os
 import json
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
+from telegram.helpers import mention_html
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler
 from tinydb import TinyDB, Query
 
@@ -175,21 +176,12 @@ async def button_delete(update: Update, context: CallbackContext):
 
         moderator = query.from_user
         moderator_display_name = user_display_name(moderator)
+        moderator_link = user_link(moderator)
+        banned_user_mention = mention_html(user_id, user_name)
 
-        prefix = f"{moderator_display_name} забанил "
-        banned_part = f"{user_name} "
-        suffix = f"(ID: {user_id})"
-        ban_report_message = prefix + banned_part + suffix
+        ban_report_message = f"<a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил {banned_user_mention} (ID: {user_id})"
 
-        banned_user_link = f"tg://user?id={user_id}"
-        entities = [MessageEntity(
-            type=MessageEntity.TEXT_LINK,
-            offset=len(prefix),
-            length=len(banned_part.rstrip()),
-            url=banned_user_link
-        )]
-
-        await query.message.reply_text(ban_report_message, entities=entities)
+        await query.message.reply_html(ban_report_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
             
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
