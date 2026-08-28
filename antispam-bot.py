@@ -4,9 +4,7 @@ import logging
 import os
 import re
 import json
-import sys
 import emoji
-sys.path.append('/opt/homebrew/lib/python3.11/site-packages')
 from is_spam_message import new_is_spam_message, has_critical_patterns, has_mixed_words
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -27,6 +25,23 @@ TARGET_CHAT = os.getenv('TARGET_GROUP_ID')
 PRIMARY_ADMIN = os.getenv('PRIMARY_ADMIN') or ''
 BACKUP_ADMIN = os.getenv('BACKUP_ADMIN') or ''
 ADMIN_MENTIONS = f'@{PRIMARY_ADMIN} @{BACKUP_ADMIN}' if PRIMARY_ADMIN and BACKUP_ADMIN else ''
+
+if not TOKEN:
+    raise ValueError("ANTISPAM_TOKEN environment variable is not set")
+if not TARGET_CHAT:
+    raise ValueError("TARGET_GROUP_ID environment variable is not set")
+
+def user_display_name(user):
+    if user is None:
+        return "Unknown"
+    return f"{user.first_name or ''} {user.last_name or ''}".strip() or "Unknown"
+
+def user_link(user):
+    if user is None:
+        return ""
+    if user.username:
+        return f"https://t.me/{user.username}"
+    return f"tg://user?id={user.id}"
 
 class DeleteCallbackData:
     def __init__(self, chat_id, message_id, user_id, update_message_id):
@@ -130,68 +145,51 @@ def check_hashtags(text):
     else:
         return None
 
-async def report_manually(update: Update, context: CallbackContext):  
-    if update.message.reply_to_message:
-        reply_to_message = update.message.reply_to_message
-        numeric_chat_id = reply_to_message.chat.id
-        chat_id = str(numeric_chat_id).replace("-100", "")
-        message_id = reply_to_message.message_id
-        user = reply_to_message.from_user
-        if user.last_name is not None:
-            user_display_name = f"{user.first_name} {user.last_name}"
-        elif user.last_name is None:
-            user_display_name = f"{user.first_name}"
-        user_link = f"https://t.me/{user.username}"
-        link = f"https://t.me/c/{chat_id}/{message_id}"
-        callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
-        callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized)]
-        ])
-        
-        words = reply_to_message.text or reply_to_message.caption
-
-        reg_pattern = '|'.join(map(re.escape, REGULAR_TOKENS))
-        crypto_pattern = '|'.join(map(re.escape, FINCRYPTO_TOKENS))
-        regular_patterns = re.findall(reg_pattern, words)
-        num_regular = len(regular_patterns)
-        crypto_patterns = re.findall(crypto_pattern, words)
-        num_crypto = len(crypto_patterns)
-		    
-        mixed_words = has_mixed_words(words)
-        num_mixed = len(mixed_words)        
-
-        repeated_emojis = await check_repeated_emojis(words)
-        repeated_emojis_bool = repeated_emojis is not None
-        
-        has_hashtags = check_hashtags(words)
-    
-        verdict = f"""
-<b>Обычные токены:</b> {num_regular}; [ {', '.join(regular_patterns)} ]
-<b>Финансы/крипто:</b> {num_crypto}; [ {', '.join(crypto_patterns)} ]
-<b>Смешанные слова:</b> {num_mixed}; [ {', '.join(mixed_words)} ]
-<b>4+ одинаковых эмодзи подряд:</b> {repeated_emojis_bool}
-<b>Хештеги:</b> {has_hashtags}
-        """
-        if reply_to_message.text is not None:
-            message_text = reply_to_message.text_html_urled
-            text_message_content = f"🥊 <b>Ручной бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n{ADMIN_MENTIONS}"
-            await context.bot.send_message(chat_id=TARGET_CHAT,
-                                    text=text_message_content,
-                                    disable_web_page_preview=True,
-                                    parse_mode="HTML",
-                                    reply_markup=keyboard)
-        elif reply_to_message.text is None:
-            message_text = reply_to_message.caption_html_urled
-            new_caption = f"🥊 <b>Ручной бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}\n<a href='{link}'>Открыть в чате</a>\n\n{ADMIN_MENTIONS}"
-            await context.bot.copy_message(chat_id=TARGET_CHAT,
-                                    from_chat_id=reply_to_message.chat_id,
-                                    message_id=reply_to_message.message_id,
-                                    caption=new_caption,
-                                    parse_mode="HTML",
-                                    reply_markup=keyboard)
-    else:
+async def report_manually(update: Update, context: CallbackContext):
+    if not update.message.reply_to_message:
         return
+
+    reply_to_message = update.message.reply_to_message
+    numeric_chat_id = reply_to_message.chat.id
+    chat_id = str(numeric_chat_id).replace("-100", "")
+    message_id = reply_to_message.message_id
+    user = reply_to_message.from_user
+
+    name = user_display_name(user)
+    profile_link = user_link(user)
+    chat_link = f"https://t.me/c/{chat_id}/{message_id}"
+
+    callback_data = DeleteCallbackData(chat_id, message_id, user.id, update.message.message_id)
+    callback_data_serialized = json.dumps(callback_data, cls=ManualEncoder)
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Удалить", callback_data=callback_data_serialized)]
+    ])
+
+    header = "🥊 <b>Ручной бан:</b>"
+    user_line = f"👤 <a href='{profile_link}'><b>{name}</b></a> (ID: {user.id})"
+    footer = f"<a href='{chat_link}'>Открыть в чате</a>\n\n{ADMIN_MENTIONS}"
+
+    if reply_to_message.text is not None:
+        message_text = reply_to_message.text_html_urled
+        text_message_content = f"{header}\n\n{user_line}\n\n{message_text}\n\n{footer}"
+        await context.bot.send_message(
+            chat_id=TARGET_CHAT,
+            text=text_message_content,
+            disable_web_page_preview=True,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+    else:
+        message_text = reply_to_message.caption_html_urled
+        new_caption = f"{header}\n\n{user_line}\n\n{message_text}\n\n{footer}"
+        await context.bot.copy_message(
+            chat_id=TARGET_CHAT,
+            from_chat_id=reply_to_message.chat_id,
+            message_id=reply_to_message.message_id,
+            caption=new_caption,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
 
 async def button_delete(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -219,11 +217,9 @@ async def button_delete(update: Update, context: CallbackContext):
         await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
 
         moderator = query.from_user
-        moderator_display_name = f"{moderator.first_name} {moderator.last_name or ''}".strip()
-        moderator_link = f"https://t.me/{moderator.username}"
-        ban_report_message = f"""
-        <a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил пользователя с ID {user_id}
-        """
+        moderator_display_name = user_display_name(moderator)
+        moderator_link = user_link(moderator)
+        ban_report_message = f"<a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил пользователя с ID {user_id}"
         await query.message.reply_html(ban_report_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
             
@@ -246,11 +242,8 @@ async def check_automatically(update: Update, context: CallbackContext):
     chat_id = str(numeric_chat_id).replace("-100", "")
     message_id = message.message_id
     user = message.from_user
-    if user.last_name is not None:
-        user_display_name = f"{user.first_name} {user.last_name}"
-    elif user.last_name is None:
-        user_display_name = f"{user.first_name}"
-    user_link = f"https://t.me/{user.username}"
+    display_name = user_display_name(user)
+    profile_link = user_link(user)
 
     if message.text is None and message.caption is None or (message.story is not None or message.video_note is not None):
         return
@@ -305,7 +298,7 @@ async def check_automatically(update: Update, context: CallbackContext):
             """
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+            text_message_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
 
             try:
                 await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
@@ -326,7 +319,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
             except TelegramError as e:
                 # Handle error, send a custom message if an error occurs
-                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
                 await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=error_message,
                                 disable_web_page_preview=True,
@@ -336,7 +329,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         elif message.text is None:
             message_text = message.caption_html_urled
-            caption_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+            caption_content = f"🎯 <b>Автоматический бан:</b>\n\n👤 <a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
             
             try:
                 await context.bot.copy_message(chat_id=TARGET_CHAT,
@@ -358,7 +351,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
             except TelegramError as e:
                 # Handle error, send a custom message if an error occurs
-                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+                error_message = f"Возникла ошибка при автоматическом бане: {str(e)}\n\n<a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
                 await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
@@ -387,7 +380,7 @@ async def check_automatically(update: Update, context: CallbackContext):
 
         if message.text is not None:
             message_text = message.text_html_urled
-            text_message_content = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+            text_message_content = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
             await context.bot.send_message(chat_id=TARGET_CHAT,
                                 text=text_message_content,
                                 disable_web_page_preview=True,
@@ -395,7 +388,7 @@ async def check_automatically(update: Update, context: CallbackContext):
                                 reply_markup=reply_markup)
         elif message.text is None:
             message_text = message.caption_html_urled
-            new_caption = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{user_link}'><b>{user_display_name}</b></a>\n\n{message_text}\n{verdict}"
+            new_caption = f"🔎 <b>Подозрение на спам:</b>\n\n👤 <a href='{profile_link}'><b>{display_name}</b></a>\n\n{message_text}\n{verdict}"
             await context.bot.copy_message(chat_id=TARGET_CHAT,
                                 from_chat_id=message.chat_id,
                                 message_id=message.message_id,
@@ -427,7 +420,7 @@ async def delete_stories_and_video_notes(update: Update, context: CallbackContex
             await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             db_stat.insert({
-               'type': 'ban',
+               'type': 'delete',
                'method': 'auto',
                'timestamp': current_time
             })
