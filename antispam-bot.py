@@ -6,7 +6,6 @@ import json
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
-from telegram.helpers import mention_html
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, CallbackQueryHandler
 from tinydb import TinyDB, Query
 
@@ -177,9 +176,8 @@ async def button_delete(update: Update, context: CallbackContext):
         moderator = query.from_user
         moderator_display_name = user_display_name(moderator)
         moderator_link = user_link(moderator)
-        banned_user_mention = mention_html(user_id, user_name)
 
-        ban_report_message = f"<a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил {banned_user_mention} (ID: {user_id})"
+        ban_report_message = f"<a href='{moderator_link}'><b>{moderator_display_name}</b></a> забанил {user_name} (ID: {user_id})"
 
         await query.message.reply_html(ban_report_message, disable_web_page_preview=True)
         await query.edit_message_reply_markup(None)
